@@ -127,6 +127,7 @@ details > label { margin-top: 10px; }
 .rows li.preview-hover { background: var(--tape-soft); }
 
 .here { margin-bottom: 12px; }
+#here-list { max-height: none; }
 .here h3 { margin-bottom: 6px; }
 
 /* Formats */
