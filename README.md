@@ -40,5 +40,6 @@ ES modules need a server, so opening `index.html` from disk will not work.
 - Census layer IDs change every vintage, so the app looks layers up by name at run time. If the Census renames a layer, update the regexes in `js/sources.js`.
 - ZIP codes here are **ZCTAs**, Census approximations of USPS ZIP areas. They are not official USPS delivery boundaries, and some ZIPs (PO boxes, single buildings) have no ZCTA.
 - ArcGIS servers must allow cross-origin requests (CORS) for this to read them. ArcGIS Online and most public servers do; some county servers do not, and the app says so when a request is blocked. Those need the planned Worker proxy.
-- Base map tiles come from tile.openstreetmap.org, which is fine for light use. If traffic grows, switch to a hosted tile provider (see OSM's tile usage policy).
+- The base map is a custom style (`js/basemap.js`) on free OpenMapTiles vector tiles from [OpenFreeMap](https://openfreemap.org), with no API key. The look follows a Maputnik design; the data and fonts (Noto Sans) are free equivalents. Attribution to OpenFreeMap, OpenMapTiles and OpenStreetMap is shown on the map. If traffic grows, consider donating to OpenFreeMap or self-hosting tiles.
+- Never commit API keys or tokens. `test/basemap.test.mjs` fails if the style contains any.
 - Respect each data publisher's license. The app shows the layer's copyright text when the server provides it.

@@ -1,4 +1,5 @@
 import { geojsonToKml, geojsonToGpx, kmlToKmz, featureName, bboxOf } from './convert.js';
+import { basemapStyle } from './basemap.js';
 import { STATES, BOUNDARY_TYPES, queryBoundaries, searchPortal, inspectUrl, loadLayer } from './sources.js';
 
 const $ = (id) => document.getElementById(id);
@@ -6,21 +7,10 @@ const $ = (id) => document.getElementById(id);
 // ---------- Map ----------
 const map = new maplibregl.Map({
   container: 'map',
-  style: {
-    version: 8,
-    sources: {
-      osm: {
-        type: 'raster',
-        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-        tileSize: 256,
-        maxzoom: 19,
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      },
-    },
-    layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-  },
+  style: basemapStyle,
   center: [-98.5, 39.5],
   zoom: 3.6,
+  maxPitch: 0,
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-left');
