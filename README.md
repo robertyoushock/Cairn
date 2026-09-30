@@ -4,11 +4,15 @@ Free, no-backend web tool for finding US boundaries and ArcGIS layers, previewin
 
 Test URL: https://robertyoushock.github.io/cairn/ (custom domain maps.robertyoushock.com planned, see below).
 
-## What v1 does
+## What it does
 
-- **US boundaries** from the Census Bureau's TIGERweb service: ZIP codes (ZCTAs), state house and senate districts, congressional districts, counties. Search by ID, by prefix (`802*`), or by what is in the map view.
-- **ArcGIS finder**: search ArcGIS Online (or another portal), paste a service, layer or folder URL, filter with a SQL where clause, and pull up to 50,000 features with paging.
-- **Export** to KML, KMZ, GPX, GeoJSON. GPX has no polygon type, so boundaries are written as closed tracks.
+Built for people who have never used GIS software.
+
+- **Click the map** to see every ZIP code, state house and senate district, congressional district and county at that spot, then add the ones you want. Search an address or use your location to jump there first.
+- **Or pick a type** and type ZIP codes, district numbers or county names, with prefixes like `802*` and whole-state searches.
+- **Other public map data:** search ArcGIS Online in plain words (try "fire stations" or "voting precincts"), or paste a service link. The SQL filter and feature limit are tucked away under an advanced toggle.
+- **One running list.** Everything you add builds a single list you can review, remove from, and download together.
+- **Download for where you will use it:** Google Earth or Google Maps (KML), a smaller zipped version (KMZ), GPS watches and hiking apps (GPX), or mapping software (GeoJSON). GPX has no polygon type, so boundaries are written as closed tracks.
 
 Everything runs in the browser. There is no server and no API key.
 

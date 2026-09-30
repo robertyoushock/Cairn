@@ -142,6 +142,46 @@ function buildWhere(type, layer, state, input) {
   return parts.join(' AND ') || '1=1';
 }
 
+// Give every Census feature a friendly label and a stable key so lists and de-duplication work.
+export function decorate(type, f) {
+  const p = f.properties || {};
+  const id = p.GEOID || p.OID || p.OBJECTID || p.NAME;
+  const name = type === 'zip' ? `ZIP ${p.GEOID || p.BASENAME}` : p.NAME || p.BASENAME || String(id);
+  return { ...f, properties: { ...p, name, _type: type, _key: `${type}:${id}` } };
+}
+
+const ZIP_FIELDS = 'GEOID,BASENAME,NAME,AREALAND,AREAWATER,INTPTLAT,INTPTLON,POP100,HU100';
+const ID_ORDER = ['zip', 'sldl', 'sldu', 'cd', 'county'];
+
+// What boundaries cover this exact point? Asks every Census layer at once; a layer that fails is skipped.
+export async function identifyAt(lng, lat) {
+  const jobs = ID_ORDER.map(async (type) => {
+    const layer = await resolveLayer(type);
+    const params = new URLSearchParams({
+      geometry: `${lng},${lat}`,
+      geometryType: 'esriGeometryPoint',
+      inSR: '4326',
+      spatialRel: 'esriSpatialRelIntersects',
+      where: '1=1',
+      outFields: type === 'zip' ? ZIP_FIELDS : '*',
+      outSR: '4326',
+      returnGeometry: 'true',
+      geometryPrecision: '6',
+      f: 'geojson',
+    });
+    const fc = await getJson(`${layer.url}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params,
+    });
+    return (fc.features || []).map((f) => decorate(type, f));
+  });
+  const settled = await Promise.allSettled(jobs);
+  const features = settled.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
+  const failed = settled.filter((r) => r.status === 'rejected').length;
+  return { features, failed };
+}
+
 export async function queryBoundaries({ type, state, input, bbox }) {
   const layer = await resolveLayer(type);
   let where = buildWhere(type, layer, state, input);
@@ -152,7 +192,7 @@ export async function queryBoundaries({ type, state, input, bbox }) {
   const params = new URLSearchParams({
     where,
     // The ZCTA layer's ZCTA5 column breaks "*" queries, so ask for fields by name there.
-    outFields: type === 'zip' ? 'GEOID,BASENAME,NAME,AREALAND,AREAWATER,INTPTLAT,INTPTLON,POP100,HU100' : '*',
+    outFields: type === 'zip' ? ZIP_FIELDS : '*',
     outSR: '4326',
     returnGeometry: 'true',
     geometryPrecision: '6',
@@ -170,12 +210,7 @@ export async function queryBoundaries({ type, state, input, bbox }) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params,
   });
-  fc.features = (fc.features || []).map((f) => {
-    const p = f.properties || {};
-    // Friendlier names for Census layers.
-    const label = p.NAME || p.BASENAME || p.ZCTA5;
-    return { ...f, properties: { ...p, name: label } };
-  });
+  fc.features = (fc.features || []).map((f) => decorate(type, f));
   return { fc, source: `US Census Bureau TIGERweb, ${layer.name}` };
 }
 
@@ -284,4 +319,18 @@ export async function loadLayer({ url, where = '1=1', bbox = null, limit = 10000
     copyright: info.copyrightText || '',
     geometryType: info.geometryType,
   };
+}
+
+// ---------- Place search (OpenStreetMap Nominatim; one request per search, never per keystroke) ----------
+
+export async function searchPlaces(text) {
+  const params = new URLSearchParams({ q: text, format: 'jsonv2', limit: '5', countrycodes: 'us' });
+  const rows = await getJson(`https://nominatim.openstreetmap.org/search?${params}`);
+  return rows.map((r) => ({
+    name: r.display_name,
+    lng: Number(r.lon),
+    lat: Number(r.lat),
+    // Nominatim gives [south, north, west, east]; MapLibre wants [west, south, east, north].
+    bbox: r.boundingbox ? [Number(r.boundingbox[2]), Number(r.boundingbox[0]), Number(r.boundingbox[3]), Number(r.boundingbox[1])] : null,
+  }));
 }

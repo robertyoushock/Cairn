@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { queryBoundaries, loadLayer, inspectUrl } from '../js/sources.js';
+import { queryBoundaries, identifyAt, decorate, searchPlaces, inspectUrl } from '../js/sources.js';
 
 const calls = [];
 globalThis.fetch = async (url, init) => {
@@ -56,6 +56,29 @@ assert.ok(calls.some((c) => c.u.includes('/State_County/MapServer/1?f=json')), '
 await queryBoundaries({ type: 'sldu', input: '', state: '08', bbox: [-105, 39, -104, 40] });
 assert.equal(last().where, "STATE = '08'");
 assert.equal(last().geometry, '-105,39,-104,40');
+
+
+// decorate: friendly names and stable keys
+const z = decorate('zip', { properties: { GEOID: '80202' } });
+assert.equal(z.properties.name, 'ZIP 80202');
+assert.equal(z.properties._key, 'zip:80202');
+assert.equal(decorate('county', { properties: { GEOID: '08031', NAME: 'Denver County' } }).properties.name, 'Denver County');
+
+// identifyAt: one point query per Census layer, tolerant of a layer failing
+const before = calls.length;
+const id = await identifyAt(-104.99, 39.74);
+const pointCalls = calls.slice(before).filter((c) => c.u.endsWith('/query'));
+assert.equal(pointCalls.length, 5);
+assert.ok(pointCalls.every((c) => c.body.geometryType === 'esriGeometryPoint' && c.body.geometry === '-104.99,39.74'));
+assert.equal(id.failed, 0);
+assert.ok(id.features.length >= 1 && id.features.every((f) => f.properties._key));
+
+// place search: bbox order is converted to [west, south, east, north]
+const realFetch = globalThis.fetch;
+globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => [{ display_name: 'Denver', lat: '39.74', lon: '-104.99', boundingbox: ['39.6', '39.9', '-105.1', '-104.6'] }] });
+const places = await searchPlaces('denver');
+assert.deepEqual(places[0].bbox, [-105.1, 39.6, -104.6, 39.9]);
+globalThis.fetch = realFetch;
 
 await assert.rejects(() => inspectUrl('javascript:alert(1)'), /https/);
 

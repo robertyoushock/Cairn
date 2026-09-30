@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cairn</title>
-  <meta name="description" content="Find US ZIP codes, legislative districts and ArcGIS layers, preview them on a map, and download KML, KMZ, GPX or GeoJSON. Free.">
+  <meta name="description" content="Click the map to get the ZIP code, district or county boundary you need, then download it for Google Earth, GPS apps or GIS software. Free.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -16,99 +16,121 @@
     <aside class="panel" id="panel">
       <header class="brand">
         <h1>Cairn</h1>
-        <p>ZIP codes, districts and ArcGIS layers as KML, KMZ or GPX.</p>
+        <p>Get the boundary you need and download it for Google Earth, GPS apps or mapping software.</p>
       </header>
 
-      <div class="tabs" role="tablist" aria-label="Data source">
-        <button role="tab" id="tab-census" aria-selected="true" aria-controls="view-census">US boundaries</button>
-        <button role="tab" id="tab-arcgis" aria-selected="false" aria-controls="view-arcgis" tabindex="-1">ArcGIS</button>
-      </div>
-
-      <section id="view-census" role="tabpanel" aria-labelledby="tab-census">
-        <form id="census-form" class="stack">
-          <label>Boundary type
-            <select id="b-type"></select>
-          </label>
-          <label id="b-state-wrap">State
-            <select id="b-state"></select>
-          </label>
-          <label>
-            <span id="b-input-label">ZIP codes</span>
-            <textarea id="b-input" rows="2" spellcheck="false"></textarea>
-            <small id="b-hint"></small>
-          </label>
-          <label class="check"><input type="checkbox" id="b-view"> Only what is in the map view</label>
-          <button type="submit" class="primary">Find boundaries</button>
-        </form>
-      </section>
-
-      <section id="view-arcgis" role="tabpanel" aria-labelledby="tab-arcgis" hidden>
-        <form id="search-form" class="stack">
-          <label>Search ArcGIS Online
-            <input id="s-text" type="search" placeholder="school districts Colorado" autocomplete="off">
-          </label>
-          <details>
-            <summary>Use a different portal</summary>
-            <label>Portal URL
-              <input id="s-portal" type="url" value="https://www.arcgis.com" spellcheck="false">
-            </label>
-          </details>
-          <label class="inline">Kind
-            <select id="s-kind">
-              <option value="feature">Feature services</option>
-              <option value="map">Map services</option>
-              <option value="all">Both</option>
-            </select>
-          </label>
-          <button type="submit" class="primary">Search</button>
-        </form>
-
-        <form id="url-form" class="stack">
-          <label>Or paste a service, layer or folder URL
-            <input id="u-url" type="url" placeholder="https://…/arcgis/rest/services/…/FeatureServer/0" spellcheck="false">
-          </label>
-          <button type="submit">Open URL</button>
-        </form>
-
-        <div id="browse" class="stack" hidden>
-          <h2 id="browse-title"></h2>
-          <ul id="browse-list" class="picklist"></ul>
-        </div>
-
-        <form id="layer-form" class="stack" hidden>
-          <h2 id="layer-title"></h2>
-          <label>Filter (SQL where clause)
-            <input id="l-where" type="text" value="1=1" spellcheck="false">
-          </label>
-          <label class="check"><input type="checkbox" id="l-view"> Only what is in the map view</label>
-          <label class="inline">Max features
-            <select id="l-limit">
-              <option value="2000">2,000</option>
-              <option value="10000" selected>10,000</option>
-              <option value="50000">50,000</option>
-            </select>
-          </label>
-          <button type="submit" class="primary">Load layer</button>
-        </form>
-      </section>
+      <form id="place-form" class="place" role="search">
+        <label class="sr" for="place-text">Search for a place or address</label>
+        <input id="place-text" type="search" placeholder="Search a place or address" autocomplete="off">
+        <button type="submit" class="quiet">Go</button>
+        <button type="button" id="locate" class="quiet" title="Zoom to where you are">Use my location</button>
+      </form>
+      <ul id="place-results" class="picklist" hidden></ul>
 
       <div id="status" role="status" aria-live="polite"></div>
 
-      <section id="results" hidden>
-        <h2 id="results-title"></h2>
-        <ul id="feature-list" class="picklist compact"></ul>
+      <section class="step" aria-labelledby="h-pick">
+        <h2 id="h-pick"><span class="n">1</span> Pick what you need</h2>
+        <p class="lead"><strong>Click anywhere on the map</strong> to see every ZIP code, district and county at that spot. Or choose a type:</p>
 
-        <form id="export-form" class="stack">
-          <label>File name
-            <input id="x-name" type="text" value="boundaries" spellcheck="false">
+        <div id="here" class="here" hidden>
+          <h3>At the spot you clicked</h3>
+          <ul id="here-list" class="rows"></ul>
+        </div>
+
+        <div class="cards" id="cards" role="group" aria-label="Boundary types"></div>
+
+        <form id="type-form" class="stack sub" hidden>
+          <h3 id="type-title"></h3>
+          <label id="t-state-wrap">State
+            <select id="t-state"></select>
           </label>
-          <div class="formats" role="group" aria-label="Download format">
-            <button type="button" data-fmt="kml">KML</button>
-            <button type="button" data-fmt="kmz">KMZ</button>
-            <button type="button" data-fmt="gpx">GPX</button>
-            <button type="button" data-fmt="geojson">GeoJSON</button>
+          <label>
+            <span id="t-label"></span>
+            <textarea id="t-input" rows="2" spellcheck="false"></textarea>
+            <small id="t-hint"></small>
+          </label>
+          <label class="check"><input type="checkbox" id="t-view"> Only what is on the screen right now</label>
+          <div class="row">
+            <button type="submit" class="primary">Add to my list</button>
+            <button type="button" id="type-cancel" class="quiet">Cancel</button>
           </div>
-          <small id="x-note"></small>
+        </form>
+
+        <details class="more" id="other">
+          <summary>Looking for something else? Search other public map data</summary>
+          <p class="lead">Thousands of cities, counties and agencies share maps online. Try a search like one of these:</p>
+          <div class="chips" id="chips"></div>
+          <form id="search-form" class="stack">
+            <label class="sr" for="s-text">Search public map data</label>
+            <input id="s-text" type="search" placeholder="school districts Colorado" autocomplete="off">
+            <button type="submit" class="primary">Search</button>
+          </form>
+
+          <div id="browse" class="stack" hidden>
+            <h3 id="browse-title"></h3>
+            <ul id="browse-list" class="picklist"></ul>
+          </div>
+
+          <form id="layer-form" class="stack sub" hidden>
+            <h3 id="layer-title"></h3>
+            <button type="submit" class="primary">Add to my list</button>
+            <details>
+              <summary>Filter or limit what gets added</summary>
+              <label>Filter (SQL, optional)
+                <input id="l-where" type="text" value="1=1" spellcheck="false">
+              </label>
+              <label class="check"><input type="checkbox" id="l-view"> Only what is on the screen right now</label>
+              <label class="inline">Most to add
+                <select id="l-limit">
+                  <option value="2000">2,000</option>
+                  <option value="10000" selected>10,000</option>
+                  <option value="50000">50,000</option>
+                </select>
+              </label>
+            </details>
+          </form>
+
+          <form id="url-form" class="stack">
+            <details>
+              <summary>Already have a link to a map service?</summary>
+              <label>Paste the link
+                <input id="u-url" type="url" placeholder="https://…/FeatureServer/0" spellcheck="false">
+              </label>
+              <button type="submit">Open link</button>
+            </details>
+          </form>
+        </details>
+      </section>
+
+      <section class="step" aria-labelledby="h-list">
+        <h2 id="h-list"><span class="n">2</span> Check your list</h2>
+        <p id="empty" class="lead">Nothing yet. Click the map or choose a type above.</p>
+        <ul id="feature-list" class="rows" hidden></ul>
+        <div class="row" id="list-actions" hidden>
+          <span id="count"></span>
+          <button type="button" id="clear" class="quiet">Clear list</button>
+        </div>
+      </section>
+
+      <section class="step" aria-labelledby="h-get">
+        <h2 id="h-get"><span class="n">3</span> Download</h2>
+        <form id="export-form" class="stack">
+          <fieldset class="formats">
+            <legend>Where will you use it?</legend>
+            <label class="fmt"><input type="radio" name="fmt" value="kml" checked>
+              <span><strong>Google Earth or Google Maps</strong><small>KML file. Not sure? Pick this one.</small></span></label>
+            <label class="fmt"><input type="radio" name="fmt" value="kmz">
+              <span><strong>Google Earth, smaller file</strong><small>KMZ is a zipped KML.</small></span></label>
+            <label class="fmt"><input type="radio" name="fmt" value="gpx">
+              <span><strong>GPS watch or hiking app</strong><small>GPX file. Boundaries become outline tracks.</small></span></label>
+            <label class="fmt"><input type="radio" name="fmt" value="geojson">
+              <span><strong>Mapping software or code</strong><small>GeoJSON works in QGIS, ArcGIS and web maps.</small></span></label>
+          </fieldset>
+          <label>File name
+            <input id="x-name" type="text" value="cairn-export" spellcheck="false">
+          </label>
+          <button type="submit" class="primary" id="download" disabled>Download</button>
         </form>
       </section>
 
@@ -119,7 +141,7 @@
     </aside>
 
     <main class="stage">
-      <div id="map" aria-label="Map preview"></div>
+      <div id="map" aria-label="Map"></div>
       <button id="panel-toggle" class="sheet-toggle" aria-controls="panel" aria-expanded="true">Hide panel</button>
     </main>
   </div>
