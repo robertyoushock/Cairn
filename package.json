@@ -1,0 +1,12 @@
+{
+  "name": "cairn",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Find US ZIP codes, districts and ArcGIS layers and export KML, KMZ, GPX or GeoJSON.",
+  "scripts": {
+    "test": "node test/convert.test.mjs && node test/sources.test.mjs",
+    "start": "npx --yes serve ."
+  },
+  "license": "MIT"
+}

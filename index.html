@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cairn</title>
+  <meta name="description" content="Find US ZIP codes, legislative districts and ArcGIS layers, preview them on a map, and download KML, KMZ, GPX or GeoJSON. Free.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="panel" id="panel">
+      <header class="brand">
+        <h1>Cairn</h1>
+        <p>ZIP codes, districts and ArcGIS layers as KML, KMZ or GPX.</p>
+      </header>
+
+      <div class="tabs" role="tablist" aria-label="Data source">
+        <button role="tab" id="tab-census" aria-selected="true" aria-controls="view-census">US boundaries</button>
+        <button role="tab" id="tab-arcgis" aria-selected="false" aria-controls="view-arcgis" tabindex="-1">ArcGIS</button>
+      </div>
+
+      <section id="view-census" role="tabpanel" aria-labelledby="tab-census">
+        <form id="census-form" class="stack">
+          <label>Boundary type
+            <select id="b-type"></select>
+          </label>
+          <label id="b-state-wrap">State
+            <select id="b-state"></select>
+          </label>
+          <label>
+            <span id="b-input-label">ZIP codes</span>
+            <textarea id="b-input" rows="2" spellcheck="false"></textarea>
+            <small id="b-hint"></small>
+          </label>
+          <label class="check"><input type="checkbox" id="b-view"> Only what is in the map view</label>
+          <button type="submit" class="primary">Find boundaries</button>
+        </form>
+      </section>
+
+      <section id="view-arcgis" role="tabpanel" aria-labelledby="tab-arcgis" hidden>
+        <form id="search-form" class="stack">
+          <label>Search ArcGIS Online
+            <input id="s-text" type="search" placeholder="school districts Colorado" autocomplete="off">
+          </label>
+          <details>
+            <summary>Use a different portal</summary>
+            <label>Portal URL
+              <input id="s-portal" type="url" value="https://www.arcgis.com" spellcheck="false">
+            </label>
+          </details>
+          <label class="inline">Kind
+            <select id="s-kind">
+              <option value="feature">Feature services</option>
+              <option value="map">Map services</option>
+              <option value="all">Both</option>
+            </select>
+          </label>
+          <button type="submit" class="primary">Search</button>
+        </form>
+
+        <form id="url-form" class="stack">
+          <label>Or paste a service, layer or folder URL
+            <input id="u-url" type="url" placeholder="https://…/arcgis/rest/services/…/FeatureServer/0" spellcheck="false">
+          </label>
+          <button type="submit">Open URL</button>
+        </form>
+
+        <div id="browse" class="stack" hidden>
+          <h2 id="browse-title"></h2>
+          <ul id="browse-list" class="picklist"></ul>
+        </div>
+
+        <form id="layer-form" class="stack" hidden>
+          <h2 id="layer-title"></h2>
+          <label>Filter (SQL where clause)
+            <input id="l-where" type="text" value="1=1" spellcheck="false">
+          </label>
+          <label class="check"><input type="checkbox" id="l-view"> Only what is in the map view</label>
+          <label class="inline">Max features
+            <select id="l-limit">
+              <option value="2000">2,000</option>
+              <option value="10000" selected>10,000</option>
+              <option value="50000">50,000</option>
+            </select>
+          </label>
+          <button type="submit" class="primary">Load layer</button>
+        </form>
+      </section>
+
+      <div id="status" role="status" aria-live="polite"></div>
+
+      <section id="results" hidden>
+        <h2 id="results-title"></h2>
+        <ul id="feature-list" class="picklist compact"></ul>
+
+        <form id="export-form" class="stack">
+          <label>File name
+            <input id="x-name" type="text" value="boundaries" spellcheck="false">
+          </label>
+          <div class="formats" role="group" aria-label="Download format">
+            <button type="button" data-fmt="kml">KML</button>
+            <button type="button" data-fmt="kmz">KMZ</button>
+            <button type="button" data-fmt="gpx">GPX</button>
+            <button type="button" data-fmt="geojson">GeoJSON</button>
+          </div>
+          <small id="x-note"></small>
+        </form>
+      </section>
+
+      <footer class="foot">
+        <p id="source-note"></p>
+        <p>Free and open source. <a href="https://github.com/robertyoushock/cairn" id="gh-link">Source on GitHub</a></p>
+      </footer>
+    </aside>
+
+    <main class="stage">
+      <div id="map" aria-label="Map preview"></div>
+      <button id="panel-toggle" class="sheet-toggle" aria-controls="panel" aria-expanded="true">Hide panel</button>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
