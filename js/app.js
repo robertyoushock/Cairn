@@ -179,7 +179,9 @@ function renderHere(features) {
   $('here').hidden = features.length === 0;
 }
 
+let lastSpot = null; // where results are ranked from: last click, search or location
 async function identify(lng, lat) {
+  lastSpot = { lng, lat };
   const token = ++hereToken;
   if (marker) marker.remove();
   marker = new maplibregl.Marker({ color: '#0f5c63' }).setLngLat([lng, lat]).addTo(map);
@@ -308,6 +310,7 @@ $('place-form').addEventListener('submit', (e) => {
 });
 
 function goTo({ lng, lat, bbox }) {
+  lastSpot = { lng, lat };
   const small = bbox && bbox[2] - bbox[0] < 0.3;
   if (bbox && !small) fit(bbox, 12);
   else map.flyTo({ center: [lng, lat], zoom: 13.5, duration: 700 });
@@ -460,6 +463,7 @@ async function searchArcgis(text, token, cat) {
     return status(cat.length ? 'Pick a verified result.' : 'No matches. Try simpler words.', cat.length ? '' : 'error');
   }
   const final = await vetResults(items, text, {
+    near: lastSpot || (() => { const c = map.getCenter(); return { lng: c.lng, lat: c.lat }; })(),
     onFound: render,
     onProgress: (d, n) => { if (token === findToken) prog.textContent = `Checking results… ${d} of ${n}`; },
   });
@@ -467,7 +471,7 @@ async function searchArcgis(text, token, cat) {
   render(final);
   const shown = more.children.length;
   prog.textContent = shown
-    ? 'Each of these was opened and checked: it has real shapes and downloads cleanly.'
+    ? 'Each of these was opened and checked. Sorted by distance from the spot you last clicked, then most recently updated, then most items.'
     : 'None of the results were usable (empty or table-only). Try different words.';
   status(shown || cat.length ? 'Pick a result to preview it.' : 'No usable results. Try different words.', shown || cat.length ? '' : 'error');
 }

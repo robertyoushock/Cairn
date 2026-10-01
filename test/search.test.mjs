@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { parseIntent, boundaryResult, findState } from '../js/intent.js';
 import { scoreEntry, searchCatalog, tokenize } from '../js/catalog.js';
-import { pickLabelFields, scoreCandidate, dedupe, displayTitle, describeCandidate } from '../js/vet.js';
+import { pickLabelFields, scoreCandidate, dedupe, displayTitle, describeCandidate, distanceToBox, sortCandidates } from '../js/vet.js';
 import { applyLabels } from '../js/sources.js';
 
 // ---- plain-language intent ----
@@ -83,5 +83,26 @@ assert.equal(feats[1].properties.name, 'Feature 2', 'blank labels get a readable
 const cams = [{ properties: {} }];
 applyLabels(cams, null, 'License plate reader');
 assert.equal(cams[0].properties.name, 'License plate reader');
+
+// ---- ordering: distance, then last update, then size ----
+const denver = { lng: -104.99, lat: 39.74 };
+assert.equal(distanceToBox(denver, [-105.2, 39.6, -104.6, 39.9]), 0, 'inside the box');
+const toBoulder = distanceToBox(denver, [-105.3, 40.0, -105.2, 40.1]);
+assert.ok(toBoulder > 20 && toBoulder < 60, `Denver to Boulder box is ${toBoulder} km`);
+assert.equal(distanceToBox(denver, null), null);
+const mk = (name, distKm, modified, count) => ({ name, distKm, modified, count, lastEdit: 0 });
+const order = sortCandidates([
+  mk('far-fresh-big', 3000, 9e12, 9999),
+  mk('here-old-big', 0, 1e12, 5000),
+  mk('here-fresh-small', 0, 9e12, 10),
+  mk('here-fresh-big', 10, 9e12, 500),
+  mk('unknown', null, 9e12, 9999),
+]).map((c) => c.name);
+assert.equal(order[0], 'here-fresh-big', 'same 25 km step: newest first, then biggest');
+assert.equal(order[1], 'here-fresh-small');
+assert.equal(order[2], 'here-old-big');
+assert.equal(order.at(-1), 'unknown', 'unknown footprint sorts last');
+assert.match(describeCandidate({ ...base, distKm: 0 }), /covers this spot/);
+assert.match(describeCandidate({ ...base, distKm: 100 }), /62 mi away/);
 
 console.log('search checks passed');

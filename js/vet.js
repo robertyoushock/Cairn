@@ -63,14 +63,41 @@ export function dedupe(cands) {
 
 const isLayerUrl = (u) => /\/(Feature|Map)Server\/\d+$/i.test(u);
 
-async function probeLayer(layerUrl, item, layerNameFallback) {
+const R_KM = 6371;
+// Distance in km from a point to a bounding box [w, s, e, n]; 0 when the point is inside it.
+export function distanceToBox(near, box) {
+  if (!near || !box || box.some((n) => !Number.isFinite(n))) return null;
+  const lng = Math.min(Math.max(near.lng, box[0]), box[2]);
+  const lat = Math.min(Math.max(near.lat, box[1]), box[3]);
+  const rad = (d) => (d * Math.PI) / 180;
+  const a = Math.sin(rad(lat - near.lat) / 2) ** 2 + Math.cos(rad(near.lat)) * Math.cos(rad(lat)) * Math.sin(rad(lng - near.lng) / 2) ** 2;
+  return Math.round(2 * R_KM * Math.asin(Math.min(1, Math.sqrt(a))));
+}
+
+// The order people asked for: closest to the spot, then most recently updated, then most features.
+// Distances are grouped in 25 km steps so a slightly closer but years-stale layer does not beat a fresh one.
+export function sortCandidates(cands) {
+  const bucket = (c) => (c.distKm == null ? Infinity : Math.floor(c.distKm / 25));
+  const when = (c) => Math.max(c.lastEdit || 0, c.modified || 0);
+  return [...cands].sort((a, b) => bucket(a) - bucket(b) || when(b) - when(a) || (b.count || 0) - (a.count || 0) || (b.score || 0) - (a.score || 0));
+}
+
+async function probeLayer(layerUrl, item, layerNameFallback, near) {
   const info = await getJson(`${layerUrl}?f=json`);
   if (!info.geometryType) return null; // a table or something with no shapes
   if (info.capabilities && !/query/i.test(info.capabilities)) return null;
   const count = (await getJson(`${layerUrl}/query?where=1%3D1&returnCountOnly=true&f=json`)).count;
   if (!count) return null; // empty layer
   const labelOptions = pickLabelFields(info.fields, info.displayField);
+  let distKm = null;
+  if (near) {
+    try {
+      const e = (await getJson(`${layerUrl}/query?where=1%3D1&returnExtentOnly=true&outSR=4326&f=json`)).extent;
+      if (e) distKm = distanceToBox(near, [e.xmin, e.ymin, e.xmax, e.ymax]);
+    } catch { /* unknown footprint sorts last */ }
+  }
   return {
+    distKm,
     url: layerUrl,
     itemTitle: item.title,
     layerName: info.name || layerNameFallback,
@@ -89,11 +116,11 @@ async function probeLayer(layerUrl, item, layerNameFallback) {
 }
 
 // Look inside one search result and return its usable layers. Never throws: a broken service just yields [].
-export async function probeItem(item, query = '') {
+export async function probeItem(item, query = '', near = null) {
   try {
     const url = (item.url || '').replace(/[?#].*$/, '').replace(/\/+$/, '');
     if (!url) return [];
-    if (isLayerUrl(url)) return [await probeLayer(url, item, item.title)].filter(Boolean);
+    if (isLayerUrl(url)) return [await probeLayer(url, item, item.title, near)].filter(Boolean);
     if (!/\/(Feature|Map)Server$/i.test(url)) return [];
     const svc = await getJson(`${url}?f=json`);
     const q = tokenize(query);
@@ -102,7 +129,7 @@ export async function probeItem(item, query = '') {
       .map((l) => ({ ...l, rel: tokenize(l.name).filter((t) => q.includes(t)).length }))
       .sort((a, b) => b.rel - a.rel)
       .slice(0, 6);
-    const out = await Promise.all(layers.map((l) => probeLayer(`${url}/${l.id}`, item, l.name).catch(() => null)));
+    const out = await Promise.all(layers.map((l) => probeLayer(`${url}/${l.id}`, item, l.name, near).catch(() => null)));
     return out.filter(Boolean).map((c) => ({ ...c, multi: layers.length > 1 }));
   } catch {
     return [];
@@ -115,6 +142,8 @@ export function displayTitle(c) {
 
 export function describeCandidate(c) {
   const bits = [`${c.count.toLocaleString()} ${geometryNoun(c.geometryType)}`];
+  if (c.distKm === 0) bits.push('covers this spot');
+  else if (c.distKm > 0) bits.push(`${Math.round(c.distKm * 0.621).toLocaleString()} mi away`);
   const when = Math.max(c.lastEdit || 0, c.modified || 0);
   if (when) bits.push(`updated ${new Date(when).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`);
   if (c.owner) bits.push(`by ${c.owner}`);
@@ -122,23 +151,23 @@ export function describeCandidate(c) {
 }
 
 // Probe a page of search results with limited concurrency, reporting each good layer as soon as it is found.
-export async function vetResults(items, query, { onFound = () => {}, onProgress = () => {}, concurrency = 4, max = 12 } = {}) {
+export async function vetResults(items, query, { onFound = () => {}, onProgress = () => {}, concurrency = 4, max = 12, near = null } = {}) {
   const queue = items.slice(0, max).map((it, i) => ({ it, i }));
   const found = [];
   let done = 0;
   async function worker() {
     while (queue.length) {
       const { it, i } = queue.shift();
-      const layers = await probeItem(it, query);
+      const layers = await probeItem(it, query, near);
       for (const c of layers) {
         c.score = scoreCandidate(c, query, i);
         found.push(c);
       }
       done++;
       onProgress(done, Math.min(items.length, max));
-      if (layers.length) onFound(dedupe(found).sort((a, b) => b.score - a.score));
+      if (layers.length) onFound(sortCandidates(dedupe(found)));
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, worker));
-  return dedupe(found).sort((a, b) => b.score - a.score);
+  return sortCandidates(dedupe(found));
 }
