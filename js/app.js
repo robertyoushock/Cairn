@@ -2,8 +2,12 @@ import { geojsonToKml, geojsonToGpx, kmlToKmz, featureName, bboxOf } from './con
 import { basemapStyle } from './basemap.js';
 import {
   STATES, BOUNDARY_TYPES, queryBoundaries, identifyAt, searchPlaces, cleanAddress,
-  searchPortal, inspectUrl, loadLayer,
+  searchPortal, inspectUrl, loadLayer, loadGeoJsonUrl, applyLabels, getJson,
 } from './sources.js';
+import { boundaryResult } from './intent.js';
+import { loadCatalog, searchCatalog } from './catalog.js';
+import { vetResults, pickLabelFields, displayTitle, describeCandidate } from './vet.js';
+import { RELAY_URL } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -294,102 +298,258 @@ $('type-form').addEventListener('submit', (e) => {
   });
 });
 
-// ---------- Other public map data (ArcGIS) ----------
-let selectedLayer = null;
-const CHIPS = ['school districts Colorado', 'fire stations', 'parks and trails', 'voting precincts', 'city limits', 'bike lanes'];
+// ---------- Find data ----------
+const CHIPS = ['texas state house', 'wildfires', 'earthquakes', 'school districts colorado', 'flock cameras', 'fire stations', 'bike lanes'];
 for (const c of CHIPS) {
   const b = el('button', { type: 'button', className: 'chip', textContent: c });
-  b.addEventListener('click', () => { $('s-text').value = c; $('search-form').requestSubmit(); });
+  b.addEventListener('click', () => { $('find-text').value = c; $('find-form').requestSubmit(); });
   $('chips').append(b);
 }
 
-function showBrowse(title, items) {
-  $('browse').hidden = false;
-  $('browse-title').textContent = title;
-  const ul = $('browse-list');
-  ul.replaceChildren();
-  for (const it of items) {
-    const b = el('button', { type: 'button' }, el('span', { className: 't', textContent: it.title }));
-    if (it.sub) b.append(el('span', { className: 's', textContent: it.sub }));
-    b.addEventListener('click', it.onPick);
-    ul.append(el('li', {}, b));
-  }
-  if (!items.length) ul.append(el('li', { textContent: 'Nothing found.', style: 'padding:10px' }));
+let findToken = 0;
+let detail = null; // what is open in the preview panel
+
+function resultRow(title, sub, badge, onPick) {
+  const t = el('span', { className: 't', textContent: title });
+  if (badge) t.append(el('span', { className: badge.soft ? 'badge soft' : 'badge', textContent: badge.text }));
+  const b = el('button', { type: 'button' }, t);
+  if (sub) b.append(el('span', { className: 's', textContent: sub }));
+  b.addEventListener('click', onPick);
+  return el('li', {}, b);
 }
 
+function showResults() {
+  $('detail').hidden = true;
+  setPreview(null);
+  detail = null;
+  $('find-results').hidden = false;
+}
+
+$('find-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = $('find-text').value.trim();
+  if (!text) return status('Type what you are looking for first.', 'error');
+  const token = ++findToken;
+  $('detail').hidden = true;
+  $('find-results').hidden = false;
+  const verified = $('r-verified');
+  const more = $('r-more');
+  verified.replaceChildren();
+  more.replaceChildren();
+  $('r-progress').textContent = '';
+  run(e.submitter, 'Searching…', async () => {
+    // 1. Verified: Census boundaries understood from plain words, plus the hand-checked catalog.
+    const entries = await loadCatalog();
+    if (token !== findToken) return;
+    const b = boundaryResult(text);
+    const cat = searchCatalog(entries, text);
+    if (b) {
+      verified.append(resultRow(b.title, b.sub, { text: 'Verified' }, () => pickBoundary(b)));
+    }
+    cat.forEach((en) => verified.append(resultRow(en.title, `${en.agency} · ${en.freshness || ''}`.replace(/ · $/, ''), { text: 'Verified' }, () => openDetail({ source: 'catalog', entry: en }))));
+    const nVerified = verified.children.length;
+    $('r-verified-h').hidden = verified.hidden = nVerified === 0;
+
+    // A clear Census match needs no ArcGIS hunt. Offer it, but do not make people wade through it.
+    if (b && b.kind === 'boundary') {
+      $('r-more-h').hidden = true;
+      const again = el('button', { type: 'button', className: 'linkish', textContent: 'Also look in ArcGIS Online' });
+      again.addEventListener('click', () => { again.remove(); searchArcgis(text, token, cat); });
+      $('r-progress').replaceChildren(again);
+      status('Found it. Pick a result.');
+      return;
+    }
+    await searchArcgis(text, token, cat);
+  });
+});
+
+async function searchArcgis(text, token, cat) {
+  $('r-more-h').hidden = false;
+  const more = $('r-more');
+  const prog = $('r-progress');
+  prog.textContent = 'Looking through ArcGIS Online…';
+  const known = new Set(cat.map((c) => c.url));
+  const render = (cands) => {
+    if (token !== findToken) return;
+    more.replaceChildren();
+    cands.filter((c) => !known.has(c.url)).slice(0, 8).forEach((c) => {
+      more.append(resultRow(displayTitle(c), describeCandidate(c), c.authoritative ? { text: 'Authoritative' } : null, () => openDetail({ source: 'arcgis', cand: c })));
+    });
+  };
+  const items = await searchPortal('https://www.arcgis.com', text, 'all');
+  if (token !== findToken) return;
+  if (!items.length) {
+    prog.textContent = 'Nothing on ArcGIS Online matched. Try fewer or simpler words.';
+    return status(cat.length ? 'Pick a verified result.' : 'No matches. Try simpler words.', cat.length ? '' : 'error');
+  }
+  const final = await vetResults(items, text, {
+    onFound: render,
+    onProgress: (d, n) => { if (token === findToken) prog.textContent = `Checking results… ${d} of ${n}`; },
+  });
+  if (token !== findToken) return;
+  render(final);
+  const shown = more.children.length;
+  prog.textContent = shown
+    ? 'Each of these was opened and checked: it has real shapes and downloads cleanly.'
+    : 'None of the results were usable (empty or table-only). Try different words.';
+  status(shown || cat.length ? 'Pick a result to preview it.' : 'No usable results. Try different words.', shown || cat.length ? '' : 'error');
+}
+
+async function pickBoundary(b) {
+  if (b.kind === 'boundary-form') {
+    chooseType(b.type);
+    if (b.state) stateSel.value = b.state;
+    $('type-form').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return status(b.sub);
+  }
+  run(null, 'Asking the Census Bureau…', async () => {
+    const { fc, source } = await queryBoundaries({ type: b.type, state: b.state || stateSel.value, input: b.input, bbox: null });
+    if (!fc.features.length) return status('Nothing matched. Check the spelling or numbers.', 'error');
+    const added = addFeatures(fc.features);
+    $('source-note').textContent = `Data: ${source}`;
+    status(`Added ${plural(added, 'item', 'items')}. Check the map, then download below.`);
+  });
+}
+
+// ---------- Preview before adding ----------
+const labelChoices = (props) =>
+  Object.entries(props || {})
+    .filter(([k, v]) => typeof v === 'string' && v.trim() && !k.startsWith('_'))
+    .map(([k]) => ({ name: k, alias: k, score: 5 }));
+
+async function openDetail(d) {
+  const token = ++findToken; // cancels any search still filling in
+  const entry = d.entry;
+  const cand = d.cand;
+  const title = entry ? entry.title : displayTitle(cand);
+  detail = { ...d, title, token, sample: [] };
+  $('find-results').hidden = true;
+  $('detail').hidden = false;
+  $('detail-title').textContent = title;
+  $('detail-meta').textContent = entry ? `${entry.description} Source: ${entry.attribution}.` : `${describeCandidate(cand)}${cand.copyright ? `. ${cand.copyright.slice(0, 120)}` : ''}`;
+  const warn = $('detail-warn');
+  const add = $('detail-add');
+  warn.hidden = true;
+  add.disabled = false;
+  const blocked = entry?.needsRelay && !RELAY_URL;
+  const notes = [];
+  if (blocked) {
+    notes.push('This source does not allow direct downloads from a web page, and the Cairn relay it needs is not turned on yet, so it cannot be added right now.');
+    add.disabled = true;
+  }
+  if (entry?.large || (cand && cand.count > 20000)) notes.push('This is a very large dataset. Tick "Only what is on the screen right now" under Filter, or zoom to your area first.');
+  if (notes.length) { warn.textContent = notes.join(' '); warn.hidden = false; }
+  $('detail-sample').textContent = '';
+  const sel = $('detail-label');
+  sel.replaceChildren();
+  $('detail-label-wrap').hidden = !!entry?.fixedLabel;
+
+  const setLabelOptions = (opts, chosen) => {
+    sel.replaceChildren();
+    opts.slice(0, 8).forEach((o) => sel.add(new Option(o.alias && o.alias !== o.name ? `${o.alias} (${o.name})` : o.name, o.name)));
+    sel.add(new Option('Just number them (Feature 1, 2…)', ''));
+    sel.value = chosen && opts.some((o) => o.name === chosen) ? chosen : opts[0]?.name ?? '';
+  };
+
+  if (cand) setLabelOptions(cand.labelOptions, cand.labelField);
+  if (blocked) return status('Preview unavailable until the relay is set up.', 'error');
+
+  status('Loading a preview…', 'busy');
+  try {
+    let sample;
+    if (cand || entry.type === 'arcgis') {
+      const url = cand ? cand.url : entry.url;
+      if (entry) {
+        const info = await getJson(`${url}?f=json`);
+        setLabelOptions(pickLabelFields(info.fields, info.displayField), entry.labelField);
+        sel.value = entry.labelField || sel.value;
+      }
+      const r = await loadLayer({ url, limit: 300, bbox: entry?.large ? mapBbox() : null });
+      sample = r.fc.features;
+    } else {
+      const r = await loadGeoJsonUrl({ url: entry.url, gz: !!entry.gz, labelField: entry.labelField, fixedLabel: entry.fixedLabel, limit: 300, relay: RELAY_URL });
+      sample = r.fc.features;
+      if (!entry.fixedLabel) setLabelOptions(labelChoices(sample[0]?.properties), entry.labelField);
+    }
+    if (token !== findToken) return;
+    detail.sample = sample;
+    if (!sample.length) {
+      warn.textContent = 'Nothing is in view for this dataset right now. Zoom the map to where you expect it, or search again.';
+      warn.hidden = false;
+      return status('The preview is empty.', 'error');
+    }
+    refreshSample();
+    whenReady(() => map.getSource('preview').setData({ type: 'FeatureCollection', features: sample }));
+    fit(bboxOf({ features: sample }), 9);
+    status('Check the names below. Change "Name each shape by" if they look wrong.');
+  } catch (e) {
+    if (token === findToken) status(`Could not preview this: ${e.message}`, 'error');
+  }
+}
+
+function refreshSample() {
+  if (!detail?.sample.length) return;
+  const field = $('detail-label').value;
+  applyLabels(detail.sample, field || null, detail.entry?.fixedLabel || null);
+  const names = detail.sample.slice(0, 3).map((f) => f.properties.name);
+  $('detail-sample').textContent = `Shapes will be named like: ${names.join(', ')}`;
+}
+$('detail-label').addEventListener('change', refreshSample);
+$('detail-back').addEventListener('click', () => { showResults(); status(''); });
+
+$('detail').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!detail) return;
+  const d = detail;
+  run(e.submitter, 'Adding…', async () => {
+    const limit = Number($('l-limit').value);
+    const bbox = $('l-view').checked ? mapBbox() : null;
+    const labelField = $('detail-label').value || null;
+    const onProgress = (n) => status(`Loaded ${n.toLocaleString()} so far…`, 'busy');
+    let r;
+    if (d.cand || d.entry.type === 'arcgis') {
+      r = await loadLayer({ url: d.cand ? d.cand.url : d.entry.url, where: $('l-where').value, bbox, limit, labelField, onProgress });
+    } else {
+      r = await loadGeoJsonUrl({ url: d.entry.url, gz: !!d.entry.gz, labelField, fixedLabel: d.entry.fixedLabel, bbox, limit, relay: RELAY_URL });
+    }
+    if (!r.fc.features.length) return status('Nothing matched. Try clearing the filter or zooming out.', 'error');
+    const base = d.cand ? d.cand.url : d.entry.url;
+    const tagged = r.fc.features.map((f, i) => ({
+      ...f,
+      properties: { ...f.properties, _type: 'other', _layer: d.title, _key: `${base}#${f.id ?? f.properties?.OBJECTID ?? i}` },
+    }));
+    const added = addFeatures(tagged);
+    const credit = d.entry ? d.entry.attribution : d.cand.copyright;
+    $('source-note').textContent = credit ? `Data: ${credit}` : '';
+    setPreview(null);
+    status(r.truncated
+      ? `Added the first ${added.toLocaleString()}. There is more: raise "Most to add" or filter to get the rest.`
+      : `Added ${plural(added, 'item', 'items')} from "${d.title}".`);
+  });
+});
+
+// ---------- Paste a link (advanced) ----------
 async function openUrl(url) {
   const r = await inspectUrl(url);
   $('u-url').value = r.url;
-  if (r.kind === 'layer') return pickLayer(r.url, r.name);
+  if (r.kind === 'layer') return openLink(r.url, r.name);
   if (r.kind === 'service') {
-    // One layer means there is nothing to choose: go straight to it.
-    if (r.layers.length === 1) return pickLayer(`${r.url}/${r.layers[0].id}`, r.layers[0].name || r.name);
-    showBrowse(`${r.name || 'This dataset'} has ${plural(r.layers.length, 'layer', 'layers')}. Pick one:`, r.layers.map((l) => ({
-      title: l.name, onPick: () => pickLayer(`${r.url}/${l.id}`, l.name),
-    })));
-    return status('Pick a layer to preview.');
+    if (r.layers.length === 1) return openLink(`${r.url}/${r.layers[0].id}`, r.layers[0].name || r.name);
+    const big = r.layers.find((l) => l.name);
+    if (big) return openLink(`${r.url}/${big.id}`, big.name);
   }
-  const go = (u, label) => run(null, label, () => openUrl(u));
-  const items = [
-    ...r.folders.map((f) => ({ title: `${f.name}/`, sub: 'Folder', onPick: () => go(f.url, 'Opening folder…') })),
-    ...r.services.map((s) => ({ title: s.name, sub: s.url.split('/').pop(), onPick: () => go(s.url, 'Opening…') })),
-  ];
-  showBrowse('Folders and datasets', items);
-  status(`${plural(items.length, 'item', 'items')} found.`);
+  throw new Error('That link is not a map layer. Paste a link ending in FeatureServer/0 (or similar), or use the search above.');
 }
-
-function pickLayer(url, name) {
-  selectedLayer = { url, name: name || 'Layer' };
-  $('layer-form').hidden = false;
-  $('layer-title').textContent = selectedLayer.name;
-  status(`Ready to add "${selectedLayer.name}". Use the button below.`);
-  $('layer-form').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+async function openLink(url, name) {
+  const info = await getJson(`${url}?f=json`);
+  const labelOptions = pickLabelFields(info.fields, info.displayField);
+  const count = (await getJson(`${url}/query?where=1%3D1&returnCountOnly=true&f=json`)).count || 0;
+  $('other').open = false;
+  openDetail({ source: 'arcgis', cand: { url, itemTitle: name || info.name || 'Layer', layerName: info.name, multi: false, count, geometryType: info.geometryType, modified: 0, lastEdit: info.editingInfo?.lastEditDate || 0, owner: '', labelOptions, labelField: labelOptions[0]?.score > 20 ? labelOptions[0].name : null, copyright: info.copyrightText || '' } });
 }
-
-$('search-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const text = $('s-text').value.trim();
-  if (!text) return status('Type what you are looking for first.', 'error');
-  run(e.submitter?.type === 'submit' ? e.submitter : null, 'Searching…', async () => {
-    const res = await searchPortal('https://www.arcgis.com', text, 'all');
-    showBrowse(res.length ? `${plural(res.length, 'result', 'results')}. Pick one:` : 'No results', res.map((r) => ({
-      title: r.title,
-      sub: `By ${r.owner}${r.views ? `, ${r.views.toLocaleString()} views` : ''}`,
-      onPick: () => run(null, 'Opening…', () => openUrl(r.url)),
-    })));
-    status(res.length ? 'Pick a result to see what is inside.' : 'No public maps matched. Try fewer or simpler words.', res.length ? '' : 'error');
-  });
-});
-
 $('url-form').addEventListener('submit', (e) => {
   e.preventDefault();
   run(e.submitter, 'Reading the link…', () => openUrl($('u-url').value));
-});
-
-$('layer-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-  if (!selectedLayer) return;
-  const layerName = selectedLayer.name;
-  run(e.submitter, 'Adding features…', async () => {
-    const limit = Number($('l-limit').value);
-    const r = await loadLayer({
-      url: selectedLayer.url,
-      where: $('l-where').value,
-      bbox: $('l-view').checked ? mapBbox() : null,
-      limit,
-      onProgress: (n) => status(`Loaded ${n.toLocaleString()} so far…`, 'busy'),
-    });
-    if (!r.fc.features.length) return status('That layer has nothing matching your filter.', 'error');
-    const tagged = r.fc.features.map((f, i) => ({
-      ...f,
-      properties: { ...f.properties, _type: 'other', _layer: layerName, _key: `${selectedLayer.url}#${f.id ?? f.properties?.OBJECTID ?? i}` },
-    }));
-    const added = addFeatures(tagged);
-    $('source-note').textContent = r.copyright ? `Data: ${r.copyright}` : '';
-    status(r.truncated
-      ? `Added the first ${added.toLocaleString()}. There are more; raise "Most to add" or filter to get the rest.`
-      : `Added ${plural(added, 'item', 'items')} from "${layerName}".`);
-  });
 });
 
 // ---------- Download ----------

@@ -65,7 +65,7 @@ export const BOUNDARY_TYPES = {
   },
 };
 
-async function getJson(url, init) {
+export async function getJson(url, init) {
   let res;
   try {
     res = await fetch(url, init);
@@ -264,7 +264,7 @@ export async function inspectUrl(rawUrl) {
   throw new Error('That URL did not look like an ArcGIS REST service, layer or services folder.');
 }
 
-export async function loadLayer({ url, where = '1=1', bbox = null, limit = 10000, onProgress = () => {} }) {
+export async function loadLayer({ url, where = '1=1', bbox = null, limit = 10000, labelField = null, onProgress = () => {} }) {
   const info = await getJson(`${url}?f=json`);
   const pageSize = Math.min(info.maxRecordCount || 1000, 2000);
   const features = [];
@@ -313,8 +313,10 @@ export async function loadLayer({ url, where = '1=1', bbox = null, limit = 10000
     if (!more || !(fc.features || []).length) break;
     offset += (fc.features || []).length;
   }
+  const out = features.slice(0, limit);
+  if (labelField) applyLabels(out, labelField);
   return {
-    fc: { type: 'FeatureCollection', features: features.slice(0, limit) },
+    fc: { type: 'FeatureCollection', features: out },
     truncated,
     name: info.name,
     copyright: info.copyrightText || '',
@@ -370,4 +372,57 @@ export async function searchPlaces(text) {
     // Fall through to OpenStreetMap if Esri is unreachable.
   }
   return nominatimSearch(text);
+}
+
+
+// ---------- Labels and plain GeoJSON sources ----------
+
+// Name every feature from one chosen field so lists and maps are readable.
+export function applyLabels(features, labelField, fixedLabel = null) {
+  features.forEach((f, i) => {
+    const p = (f.properties = f.properties || {});
+    const v = fixedLabel || (labelField && p[labelField] != null && String(p[labelField]).trim() !== '' ? String(p[labelField]) : null);
+    p.name = v || `${fixedLabel || 'Feature'} ${i + 1}`;
+  });
+  return features;
+}
+
+async function gunzipToText(res) {
+  if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack compressed data. Try a current Chrome, Safari or Firefox.');
+  const stream = res.body.pipeThrough(new DecompressionStream('gzip'));
+  return new Response(stream).text();
+}
+
+// Load a GeoJSON file from a URL. Falls back to the Cairn relay when the host blocks browser requests.
+export async function loadGeoJsonUrl({ url, gz = false, labelField = null, fixedLabel = null, bbox = null, limit = 50000, relay = '' }) {
+  const attempt = async (u) => {
+    const res = await fetch(u);
+    if (!res.ok) throw new Error(`${new URL(u).host} answered ${res.status}.`);
+    const text = gz ? await gunzipToText(res) : await res.text();
+    return JSON.parse(text);
+  };
+  let json;
+  try {
+    json = await attempt(url);
+  } catch (e) {
+    if (!relay) {
+      throw new Error(
+        `${new URL(url).host} does not allow direct browser access, and the Cairn relay is not set up yet. ` +
+        'Anything that needs it is marked in the results.'
+      );
+    }
+    json = await attempt(`${relay.replace(/\/+$/, '')}/?url=${encodeURIComponent(url)}`);
+  }
+  let features = (json.type === 'FeatureCollection' ? json.features : json.features || []).filter((f) => f && f.geometry);
+  if (bbox) {
+    const [w, s, e, n] = bbox;
+    features = features.filter((f) => {
+      const c = f.geometry.type === 'Point' ? f.geometry.coordinates : null;
+      return c ? c[0] >= w && c[0] <= e && c[1] >= s && c[1] <= n : true;
+    });
+  }
+  const truncated = features.length > limit;
+  features = features.slice(0, limit);
+  applyLabels(features, labelField, fixedLabel);
+  return { fc: { type: 'FeatureCollection', features }, truncated };
 }

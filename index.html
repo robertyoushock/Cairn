@@ -31,7 +31,50 @@
 
       <section class="step" aria-labelledby="h-pick">
         <h2 id="h-pick"><span class="n">1</span> Pick what you need</h2>
-        <p class="lead"><strong>Click anywhere on the map</strong> to see every ZIP code, district and county at that spot. Or choose a type:</p>
+        <p class="lead">Search for what you need, <strong>or click anywhere on the map</strong> to see every ZIP code, district and county at that spot.</p>
+
+        <form id="find-form" class="find" role="search">
+          <label class="sr" for="find-text">Find map data</label>
+          <input id="find-text" type="search" placeholder="Try: texas state house, wildfires, school districts" autocomplete="off">
+          <button type="submit" class="primary">Find</button>
+        </form>
+        <div class="chips" id="chips"></div>
+
+        <div id="find-results" hidden>
+          <h3 id="r-verified-h">Verified sources</h3>
+          <ul id="r-verified" class="picklist results"></ul>
+          <h3 id="r-more-h">More from ArcGIS Online</h3>
+          <p id="r-progress" class="lead"></p>
+          <ul id="r-more" class="picklist results"></ul>
+        </div>
+
+        <form id="detail" class="stack sub" hidden>
+          <button type="button" id="detail-back" class="linkish">&larr; Back to results</button>
+          <h3 id="detail-title"></h3>
+          <p id="detail-meta" class="lead"></p>
+          <p id="detail-warn" class="warn" hidden></p>
+          <label id="detail-label-wrap">Name each shape by
+            <select id="detail-label"></select>
+            <small id="detail-sample"></small>
+          </label>
+          <div class="row">
+            <button type="submit" class="primary" id="detail-add">Add to my list</button>
+          </div>
+          <details>
+            <summary>Filter or limit what gets added</summary>
+            <label>Filter (SQL, optional)
+              <input id="l-where" type="text" value="1=1" spellcheck="false">
+            </label>
+            <label class="check"><input type="checkbox" id="l-view"> Only what is on the screen right now</label>
+            <label class="inline">Most to add
+              <select id="l-limit">
+                <option value="2000">2,000</option>
+                <option value="10000" selected>10,000</option>
+                <option value="50000">50,000</option>
+              </select>
+            </label>
+          </details>
+        </form>
 
         <div id="here" class="here" hidden>
           <h3>At the spot you clicked</h3>
@@ -58,47 +101,12 @@
         </form>
 
         <details class="more" id="other">
-          <summary>Looking for something else? Search other public map data</summary>
-          <p class="lead">Thousands of cities, counties and agencies share maps online. Try a search like one of these:</p>
-          <div class="chips" id="chips"></div>
-          <form id="search-form" class="stack">
-            <label class="sr" for="s-text">Search public map data</label>
-            <input id="s-text" type="search" placeholder="school districts Colorado" autocomplete="off">
-            <button type="submit" class="primary">Search</button>
-          </form>
-
-          <div id="browse" class="stack" hidden>
-            <h3 id="browse-title"></h3>
-            <ul id="browse-list" class="picklist"></ul>
-          </div>
-
-          <form id="layer-form" class="stack sub" hidden>
-            <h3 id="layer-title"></h3>
-            <button type="submit" class="primary">Add to my list</button>
-            <details>
-              <summary>Filter or limit what gets added</summary>
-              <label>Filter (SQL, optional)
-                <input id="l-where" type="text" value="1=1" spellcheck="false">
-              </label>
-              <label class="check"><input type="checkbox" id="l-view"> Only what is on the screen right now</label>
-              <label class="inline">Most to add
-                <select id="l-limit">
-                  <option value="2000">2,000</option>
-                  <option value="10000" selected>10,000</option>
-                  <option value="50000">50,000</option>
-                </select>
-              </label>
-            </details>
-          </form>
-
+          <summary>Have a link to a map service?</summary>
           <form id="url-form" class="stack">
-            <details>
-              <summary>Already have a link to a map service?</summary>
-              <label>Paste the link
-                <input id="u-url" type="url" placeholder="https://…/FeatureServer/0" spellcheck="false">
-              </label>
-              <button type="submit">Open link</button>
-            </details>
+            <label>Paste the link
+              <input id="u-url" type="url" placeholder="https://…/FeatureServer/0" spellcheck="false">
+            </label>
+            <button type="submit">Open link</button>
           </form>
         </details>
       </section>
