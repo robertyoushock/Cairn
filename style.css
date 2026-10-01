@@ -191,3 +191,18 @@ label.fmt small { display: block; }
 .linkish { background: none; border: 0; padding: 0; color: var(--ink-soft); cursor: pointer; text-align: left; text-decoration: underline; }
 #detail-label-wrap small { display: block; color: var(--ink-soft); margin-top: 4px; }
 .sub .chips, .chips { margin-bottom: 10px; }
+
+/* ---- Map click modes ---- */
+.stage { position: relative; }
+.modebar { position: absolute; top: 10px; left: 10px; z-index: 5; display: flex; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 3px; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+.modebar button { border: 0; background: none; border-radius: 999px; padding: 7px 14px; font-weight: 700; cursor: pointer; }
+.modebar button[aria-pressed='true'] { background: var(--tape); }
+.modebar button:disabled { opacity: .45; cursor: default; }
+.hits { max-width: 280px; max-height: 260px; overflow-y: auto; font-family: inherit; }
+.hits .hit + .hit { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; }
+.hits .hn { font-weight: 700; }
+.hits .hk { color: var(--ink-soft); font-size: 12px; }
+.hits .acts { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.hits .acts button { font-size: 12px; padding: 4px 9px; cursor: pointer; }
+.hits dl { margin: 6px 0 0; font-size: 12px; display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; }
+.hits dt { color: var(--ink-soft); } .hits dd { margin: 0; word-break: break-word; }

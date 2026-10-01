@@ -99,7 +99,7 @@ function addFeatures(features, { zoom = true } = {}) {
     if (!selection.has(key)) { selection.set(key, f); added++; }
   }
   renderSelection();
-  if (zoom && features.length) fit(bboxOf({ features }));
+  if (zoom && features.length) { fit(bboxOf({ features })); setMode('list'); }
   return added;
 }
 
@@ -117,6 +117,9 @@ function renderSelection() {
   $('feature-list').hidden = n === 0;
   $('list-actions').hidden = n === 0;
   $('count').textContent = plural(n, 'item', 'items');
+  $('mode-count').textContent = n ? `(${n.toLocaleString()})` : '';
+  $('mode-list').disabled = n === 0;
+  if (n === 0 && mode === 'list') setMode('spot');
 
   const list = $('feature-list');
   list.replaceChildren();
@@ -194,8 +197,82 @@ async function identify(lng, lat) {
   $('here').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
+// ---------- Click modes ----------
+// "spot": click anywhere to see boundaries there. "list": click shapes already added to inspect or remove them.
+let mode = 'spot';
+let popup = null;
+const DATA_LAYERS = ['data-fill', 'data-line', 'data-point'];
+
+function setMode(m) {
+  if (m === 'list' && selection.size === 0) m = 'spot';
+  mode = m;
+  $('mode-spot').setAttribute('aria-pressed', String(m === 'spot'));
+  $('mode-list').setAttribute('aria-pressed', String(m === 'list'));
+  if (popup) { popup.remove(); popup = null; }
+  setPreview(null);
+  if (m === 'list') {
+    if (marker) { marker.remove(); marker = null; }
+    $('here').hidden = true;
+    status('Click a shape on the map to inspect it, remove it, or keep only that one.');
+  } else {
+    status('Click anywhere on the map to see the boundaries at that spot.');
+  }
+}
+$('mode-spot').addEventListener('click', () => setMode('spot'));
+$('mode-list').addEventListener('click', () => setMode('list'));
+
+function hitCard(f, close) {
+  const full = selection.get(f.properties._key) || f;
+  const box = el('div', { className: 'hit' }, el('div', { className: 'hn', textContent: featureName(full) }), el('div', { className: 'hk', textContent: kindOf(full) }));
+  const acts = el('div', { className: 'acts' });
+  const rm = el('button', { type: 'button', textContent: 'Remove' });
+  rm.addEventListener('click', () => { selection.delete(full.properties._key); renderSelection(); close(); status(`Removed ${featureName(full)}.`); });
+  const only = el('button', { type: 'button', textContent: 'Keep only this' });
+  only.addEventListener('click', () => {
+    const k = full.properties._key;
+    for (const key of [...selection.keys()]) if (key !== k) selection.delete(key);
+    renderSelection(); close(); fit(bboxOf({ features: [full] })); status(`Kept only ${featureName(full)}.`);
+  });
+  const more = el('button', { type: 'button', textContent: 'Details' });
+  let dl = null;
+  more.addEventListener('click', () => {
+    if (dl) { dl.remove(); dl = null; return; }
+    dl = el('dl');
+    Object.entries(full.properties).filter(([k, v]) => !k.startsWith('_') && v != null && String(v).trim() !== '').slice(0, 14)
+      .forEach(([k, v]) => dl.append(el('dt', { textContent: k }), el('dd', { textContent: String(v).slice(0, 120) })));
+    box.append(dl);
+  });
+  acts.append(rm, only, more);
+  box.append(acts);
+  return box;
+}
+
+function inspectList(point, lngLat) {
+  const seen = new Set();
+  const hits = map.queryRenderedFeatures(point, { layers: DATA_LAYERS }).filter((f) => {
+    const k = f.properties._key;
+    if (!k || seen.has(k) || !selection.has(k)) return false;
+    seen.add(k);
+    return true;
+  }).slice(0, 8);
+  if (popup) popup.remove();
+  if (!hits.length) return status('Nothing from your list here. Click a shape you added, or switch to "What\'s here?".');
+  setPreview(selection.get(hits[0].properties._key));
+  const close = () => { if (popup) popup.remove(); popup = null; setPreview(null); };
+  const wrap = el('div', { className: 'hits' });
+  hits.forEach((h) => wrap.append(hitCard(h, close)));
+  popup = new maplibregl.Popup({ maxWidth: '300px' }).setLngLat(lngLat).setDOMContent(wrap).addTo(map);
+  popup.on('close', () => { popup = null; setPreview(null); });
+  status(hits.length > 1 ? `${hits.length} shapes overlap here. Pick the one you want.` : 'Inspect it, or remove it from your list.');
+}
+
 map.on('click', (e) => {
+  if (mode === 'list') return inspectList(e.point, e.lngLat);
   identify(e.lngLat.lng, e.lngLat.lat).catch((err) => status(err.message, 'error'));
+});
+map.on('mousemove', (e) => {
+  if (mode !== 'list' || !mapReady) return;
+  map.getCanvas().style.cursor = map.queryRenderedFeatures(e.point, { layers: DATA_LAYERS }).length ? 'pointer' : '';
 });
 
 // ---------- Search a place / my location ----------
@@ -234,8 +311,8 @@ function goTo({ lng, lat, bbox }) {
   const small = bbox && bbox[2] - bbox[0] < 0.3;
   if (bbox && !small) fit(bbox, 12);
   else map.flyTo({ center: [lng, lat], zoom: 13.5, duration: 700 });
-  if (small || !bbox) identify(lng, lat).catch((err) => status(err.message, 'error'));
-  else status('Zoomed there. Click the map to see what boundaries cover a spot.');
+  if ((small || !bbox) && mode === 'spot') identify(lng, lat).catch((err) => status(err.message, 'error'));
+  else if (mode === 'spot') status('Zoomed there. Click the map to see what boundaries cover a spot.');
 }
 
 $('locate').addEventListener('click', () => {
