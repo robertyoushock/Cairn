@@ -225,7 +225,8 @@ export async function searchPortal(portal, text, kind) {
       ? 'type:"Map Service"'
       : 'type:"Feature Service"';
   const q = `${text} ${types}`;
-  const p = new URLSearchParams({ q, num: '25', sortField: 'numviews', sortOrder: 'desc', f: 'json' });
+  // Default ordering is by relevance, which suits plain-language searches better than popularity.
+  const p = new URLSearchParams({ q, num: '25', f: 'json' });
   const json = await getJson(`${base}/sharing/rest/search?${p}`);
   return (json.results || []).map((r) => ({
     id: r.id,

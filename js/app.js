@@ -316,6 +316,8 @@ async function openUrl(url) {
   $('u-url').value = r.url;
   if (r.kind === 'layer') return pickLayer(r.url, r.name);
   if (r.kind === 'service') {
+    // One layer means there is nothing to choose: go straight to it.
+    if (r.layers.length === 1) return pickLayer(`${r.url}/${r.layers[0].id}`, r.layers[0].name || r.name);
     showBrowse(`${r.name || 'This dataset'} has ${plural(r.layers.length, 'layer', 'layers')}. Pick one:`, r.layers.map((l) => ({
       title: l.name, onPick: () => pickLayer(`${r.url}/${l.id}`, l.name),
     })));
