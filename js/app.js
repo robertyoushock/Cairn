@@ -1,7 +1,7 @@
 import { geojsonToKml, geojsonToGpx, kmlToKmz, featureName, bboxOf } from './convert.js';
 import { basemapStyle } from './basemap.js';
 import {
-  STATES, BOUNDARY_TYPES, queryBoundaries, identifyAt, searchPlaces,
+  STATES, BOUNDARY_TYPES, queryBoundaries, identifyAt, searchPlaces, cleanAddress,
   searchPortal, inspectUrl, loadLayer,
 } from './sources.js';
 
@@ -200,23 +200,29 @@ $('place-form').addEventListener('submit', (e) => {
   const text = $('place-text').value.trim();
   if (!text) return status('Type a place or address first.', 'error');
   run(e.submitter?.type === 'submit' ? e.submitter : null, 'Searching…', async () => {
-    const res = await searchPlaces(text);
+    let res = await searchPlaces(text);
+    if (!res.length) {
+      // Retry without unit numbers like "#18" or "Apt 4".
+      const cleaned = cleanAddress(text);
+      if (cleaned && cleaned !== text) res = await searchPlaces(cleaned);
+    }
     const ul = $('place-results');
     ul.replaceChildren();
     if (!res.length) {
       ul.hidden = true;
-      return status('No place found. Try adding a city or state.', 'error');
+      return status('No place found. Try the street and city only, like "1437 Bannock St, Denver".', 'error');
     }
-    res.forEach((r) => {
+    // Go straight to the best match. Other matches stay available in case it guessed wrong.
+    const [best, ...others] = res;
+    goTo(best);
+    if (!others.length) { ul.hidden = true; return; }
+    ul.append(el('li', { className: 'hint', textContent: 'Not the right place? Try:' }));
+    others.forEach((r) => {
       const b = el('button', { type: 'button' }, el('span', { className: 't', textContent: r.name }));
-      b.addEventListener('click', () => {
-        ul.hidden = true;
-        goTo(r);
-      });
+      b.addEventListener('click', () => { ul.hidden = true; goTo(r); });
       ul.append(el('li', {}, b));
     });
     ul.hidden = false;
-    status('Pick the right place.');
   });
 });
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { queryBoundaries, identifyAt, decorate, searchPlaces, inspectUrl } from '../js/sources.js';
+import { queryBoundaries, identifyAt, decorate, searchPlaces, cleanAddress, inspectUrl } from '../js/sources.js';
 
 const calls = [];
 globalThis.fetch = async (url, init) => {
@@ -79,6 +79,11 @@ globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => [{ di
 const places = await searchPlaces('denver');
 assert.deepEqual(places[0].bbox, [-105.1, 39.6, -104.6, 39.9]);
 globalThis.fetch = realFetch;
+
+// unit numbers are stripped so geocoders can find the building
+assert.equal(cleanAddress('18 Sea Grass Cir #18, South Dennis, MA 02660'), '18 Sea Grass Cir, South Dennis, MA 02660');
+assert.equal(cleanAddress('500 Main St Apt 4B, Denver, CO'), '500 Main St, Denver, CO');
+assert.equal(cleanAddress('1437 Bannock St, Denver'), '1437 Bannock St, Denver');
 
 await assert.rejects(() => inspectUrl('javascript:alert(1)'), /https/);
 

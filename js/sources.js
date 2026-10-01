@@ -324,6 +324,15 @@ export async function loadLayer({ url, where = '1=1', bbox = null, limit = 10000
 
 // ---------- Place search (OpenStreetMap Nominatim; one request per search, never per keystroke) ----------
 
+// Geocoders match street addresses, not units: "18 Sea Grass Cir #18" finds nothing but "18 Sea Grass Cir" does.
+export function cleanAddress(text) {
+  return text
+    .replace(/\s*,?\s*(#|apt\.?|apartment|unit|suite|ste\.?)\s*[\w-]+/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+,/g, ',')
+    .trim();
+}
+
 export async function searchPlaces(text) {
   const params = new URLSearchParams({ q: text, format: 'jsonv2', limit: '5', countrycodes: 'us' });
   const rows = await getJson(`https://nominatim.openstreetmap.org/search?${params}`);

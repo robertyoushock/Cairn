@@ -115,6 +115,8 @@ details > label { margin-top: 10px; }
 .picklist .t { font-weight: 700; display: block; }
 .picklist .s { color: var(--ink-soft); font-size: 13px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.picklist li.hint { padding: 8px 10px; color: var(--ink-soft); font-size: 13px; background: var(--fog); }
+
 .rows li { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px; }
 .rows .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rows .name button { background: none; border: 0; padding: 4px 0; font: inherit; cursor: pointer; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
