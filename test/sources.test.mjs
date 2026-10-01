@@ -78,6 +78,23 @@ const realFetch = globalThis.fetch;
 globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => [{ display_name: 'Denver', lat: '39.74', lon: '-104.99', boundingbox: ['39.6', '39.9', '-105.1', '-104.6'] }] });
 const places = await searchPlaces('denver');
 assert.deepEqual(places[0].bbox, [-105.1, 39.6, -104.6, 39.9]);
+// Esri geocoder is tried first and wins when it has a match
+globalThis.fetch = async (url) => {
+  assert.match(String(url), /geocode\.arcgis\.com/);
+  return { ok: true, status: 200, json: async () => ({ candidates: [
+    { address: '18 Seagrass Cir, South Dennis, Massachusetts, 02660', score: 99.5, location: { x: -70.155, y: 41.707 }, extent: { xmin: -70.156, ymin: 41.706, xmax: -70.154, ymax: 41.708 } },
+    { address: 'Far away', score: 40, location: { x: 0, y: 0 } },
+  ] }) };
+};
+const esri = await searchPlaces('18 Sea Grass Cir #18, South Dennis, MA 02660');
+assert.equal(esri.length, 1, 'low-score candidates are dropped');
+assert.deepEqual(esri[0].bbox, [-70.156, 41.706, -70.154, 41.708]);
+
+// ...and OpenStreetMap is the fallback when Esri has nothing or fails
+globalThis.fetch = async (url) => String(url).includes('arcgis')
+  ? { ok: false, status: 500, json: async () => ({}) }
+  : { ok: true, status: 200, json: async () => [{ display_name: 'Fallback', lat: '1', lon: '2', boundingbox: ['0', '2', '1', '3'] }] };
+assert.equal((await searchPlaces('x'))[0].name, 'Fallback');
 globalThis.fetch = realFetch;
 
 // unit numbers are stripped so geocoders can find the building

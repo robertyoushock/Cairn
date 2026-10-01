@@ -333,7 +333,24 @@ export function cleanAddress(text) {
     .trim();
 }
 
-export async function searchPlaces(text) {
+// Esri's public geocoder handles US street addresses, fuzzy spellings and unit numbers well, and needs no key
+// for search-and-display use. Results are shown once and never stored.
+async function esriSearch(text) {
+  const params = new URLSearchParams({
+    SingleLine: text, f: 'json', maxLocations: '5', countryCode: 'USA', outFields: 'Match_addr', forStorage: 'false',
+  });
+  const j = await getJson(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?${params}`);
+  return (j.candidates || [])
+    .filter((c) => c.score >= 70 && c.location)
+    .map((c) => ({
+      name: c.address,
+      lng: c.location.x,
+      lat: c.location.y,
+      bbox: c.extent ? [c.extent.xmin, c.extent.ymin, c.extent.xmax, c.extent.ymax] : null,
+    }));
+}
+
+async function nominatimSearch(text) {
   const params = new URLSearchParams({ q: text, format: 'jsonv2', limit: '5', countrycodes: 'us' });
   const rows = await getJson(`https://nominatim.openstreetmap.org/search?${params}`);
   return rows.map((r) => ({
@@ -343,4 +360,14 @@ export async function searchPlaces(text) {
     // Nominatim gives [south, north, west, east]; MapLibre wants [west, south, east, north].
     bbox: r.boundingbox ? [Number(r.boundingbox[2]), Number(r.boundingbox[0]), Number(r.boundingbox[3]), Number(r.boundingbox[1])] : null,
   }));
+}
+
+export async function searchPlaces(text) {
+  try {
+    const found = await esriSearch(text);
+    if (found.length) return found;
+  } catch {
+    // Fall through to OpenStreetMap if Esri is unreachable.
+  }
+  return nominatimSearch(text);
 }
