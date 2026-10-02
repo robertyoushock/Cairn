@@ -678,14 +678,14 @@
       "page": "https://www.mccourtfoundation.org/event/los-angeles-marathon/",
       "group": "marathon",
       "kind": "water",
-      "labelField": "Label",
-      "where": "Type = 'Water Stations'"
+      "where": "Type = 'Water Stations'",
+      "fixedLabel": "Water station"
     },
     {
       "id": "marathon-la-miles",
       "title": "Los Angeles Marathon mile markers",
       "agency": "Los Angeles County",
-      "description": "Mile markers, start and finish. From LA County's 2025 race-day map.",
+      "description": "Mile markers. From LA County's 2025 race-day map.",
       "keywords": [
         "marathon",
         "marathons",
@@ -716,7 +716,8 @@
       "group": "marathon",
       "kind": "miles",
       "labelField": "Label",
-      "where": "Type IN ('Mile Marker','Starting Line','Finish Line')"
+      "where": "Type = 'Mile Marker'",
+      "labelPrefix": "Mile "
     },
     {
       "id": "marathon-la-medical",
@@ -753,7 +754,8 @@
       "group": "marathon",
       "kind": "medical",
       "labelField": "Label",
-      "where": "Type = 'Medical Stations'"
+      "where": "Type = 'Medical Stations'",
+      "labelPrefix": "Medical station, mile "
     },
     {
       "id": "marathon-dc-course",

@@ -695,9 +695,10 @@ function reportLink(title, url, query) {
   return `https://github.com/robertyoushock/cairn/issues/new?${p}`;
 }
 
-const labelChoices = (props) =>
+// "name" is normally Cairn's own computed label, so it is left out, unless the source itself names things with it.
+const labelChoices = (props, keep = '') =>
   Object.entries(props || {})
-    .filter(([k, v]) => typeof v === 'string' && v.trim() && !k.startsWith('_') && k !== 'name')
+    .filter(([k, v]) => typeof v === 'string' && v.trim() && !k.startsWith('_') && (k !== 'name' || keep === 'name'))
     .map(([k]) => ({ name: k, alias: k, score: 5 }));
 
 async function openDetail(d) {
@@ -769,7 +770,7 @@ async function openDetail(d) {
     } else {
       const r = await loadGeoJsonUrl({ url: entry.url, gz: !!entry.gz, labelField: entry.labelField, fixedLabel: entry.fixedLabel, limit: 300, bbox: big ? mapBbox() : null, relay: RELAY_URL, relayFirst: !!entry.needsRelay });
       sample = r.fc.features;
-      if (!entry.fixedLabel) setLabelOptions(labelChoices(sample[0]?.properties), entry.labelField);
+      if (!entry.fixedLabel) setLabelOptions(labelChoices(sample[0]?.properties, entry.labelField), entry.labelField);
     }
     if (token !== findToken) return;
     detail.sample = sample;
