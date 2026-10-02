@@ -125,13 +125,15 @@ export async function probeItem(item, query = '', near = null) {
     if (!/\/(Feature|Map)Server$/i.test(url)) return [];
     const svc = await getJson(`${url}?f=json`);
     const q = tokenize(query);
-    const layers = (svc.layers || [])
+    const all = (svc.layers || [])
       .filter((l) => l.subLayerIds == null)
       .map((l) => ({ ...l, rel: tokenize(l.name).filter((t) => q.includes(t)).length }))
-      .sort((a, b) => b.rel - a.rel)
-      .slice(0, 6);
+      .sort((a, b) => b.rel - a.rel);
+    // When some layers match the search words, the others are noise ("Police Stations" in a fire station search).
+    const wanted = (all.some((l) => l.rel > 0) ? all.filter((l) => l.rel > 0) : all).slice(0, 6);
+    const layers = wanted;
     const out = await Promise.all(layers.map((l) => probeLayer(`${url}/${l.id}`, item, l.name, near).catch(() => null)));
-    return out.filter(Boolean).map((c) => ({ ...c, multi: layers.length > 1 }));
+    return out.filter(Boolean).map((c) => ({ ...c, multi: all.length > 1 }));
   } catch {
     return [];
   }

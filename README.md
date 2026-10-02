@@ -2,53 +2,48 @@
 
 Free, no-backend web tool for finding US boundaries and ArcGIS layers, previewing them on a map, and downloading them as **KML, KMZ, GPX or GeoJSON**.
 
-Test URL: https://robertyoushock.com/Cairn/ (custom domain maps.robertyoushock.com planned, see below).
+Live at https://robertyoushock.com/cairn/
 
 ## What it does
 
 Built for people who have never used GIS software.
 
-- **Click the map** to see every ZIP code, state house and senate district, congressional district and county at that spot, then add the ones you want. Search an address or use your location to jump there first.
-- **One search box.** Type what you want in plain words ("texas state house", "wildfires", "earthquakes", "school districts colorado"). Results come in two groups: **Verified** (Census boundaries and a hand-checked catalog in `data/catalog.json`) and **More from ArcGIS Online**, where every result was opened and checked first. Empty layers, tables and duplicates are dropped, and each card says what it is, how many shapes it has, how fresh it is and who published it.
-- **Preview before adding.** Picking a result draws a sample on the map and shows how shapes will be named. A "Name each shape by" menu fixes layers that default to the wrong field (for example a person's name instead of the fire's name).
-- **Or pick a type** (ZIP codes, districts, counties) and type numbers or names, with prefixes like `802*`.
-- **One running list.** Everything you add builds a single list you can review, remove from, and download together.
-- **Download for where you will use it:** Google Earth or Google Maps (KML), a smaller zipped version (KMZ), GPS watches and hiking apps (GPX), or mapping software (GeoJSON). GPX has no polygon type, so boundaries are written as closed tracks.
+- **One search box.** Type what you want in plain words: "texas state house", "boulder city limits colorado", "wildfires", "flood zones", "fire stations". Results come in two groups: **Verified** (Census boundaries and a hand-checked catalog) and **More from ArcGIS Online**, where every result was opened and checked first. Empty layers, tables and duplicates are dropped. Results near the spot you last clicked come first.
+- **Click the map** to see every ZIP code, city, school district, legislative district and county at that spot.
+- **Preview before adding.** A sample is drawn on the map and you see how shapes will be named. A menu fixes layers that label by the wrong field. Every result links to its source.
+- **One running list.** Click shapes on the map to inspect, remove or keep only one. Filter the list by name or state.
+- **Routes.** Click the map or type addresses to build a route for driving, biking, walking, or flying plus driving. Or paste a Google Maps directions link.
+- **Download for where you will use it:** Google Earth or Google Maps (KML, KMZ), GPS watches and hiking apps (GPX), or mapping software (GeoJSON). Choose colors and labels, and shrink big files with a detail setting that warns you about Google My Maps limits.
 
-Everything runs in the browser. There is no server and no API key.
+Everything runs in the browser. No accounts, no ads, no tracking, and nothing that can run up a bill. See `docs/HANDOFF.md` for how it is built and the rules that keep it free.
 
-## Status (checkpoint)
+## Verified sources
 
-Done and live: boundary finder, click-to-identify, address search, KML/KMZ/GPX/GeoJSON export, keyless basemap, and the guided search above (catalog, plain-language boundary intent, vetted ArcGIS results, preview with label picker).
+US Census Bureau (ZIP areas, state house and senate, congressional, counties, cities and towns, school districts, tracts), NIFC wildfires, USGS earthquakes, National Park Service boundaries, national forests and trails, FEMA flood zones, NWS weather alerts, DeFlock license plate reader cameras. Full credits: `credits.html`.
 
-Known gaps:
-- **DeFlock cameras** need the optional relay in `worker/` (deploy once, then set `RELAY_URL` in `js/config.js`). Until then they show as unavailable.
-- The catalog is small on purpose. Add entries by pull request; each must load, have features and label correctly.
-- Vetting checks the top 12 ArcGIS Online hits per search.
-- Custom domain maps.robertyoushock.com is not attached yet.
+## Status (checkpoint, 2 October 2026)
 
-## Roadmap (not built yet)
+Live and checked in a real browser: every item under "What it does", including routes from a Google Maps link, fly + drive, flood zones, weather alerts, parks, DeFlock cameras through the helper, list filter, styled KML export and size warnings.
 
-1. Route builder: click to draw, walk / bike / car / plane + car, export GPX/KML. Plan: OpenRouteService (free key, proxied through a small Cloudflare Worker so the key is not public).
-2. Google Maps link to GPX: parse origin, destination and waypoints from a pasted link and re-route with the open provider. Short links (maps.app.goo.gl) need the Worker to resolve the redirect.
-3. Simplify geometry before export, merge selected features, draw-to-select.
+Not checked in a real browser: short Google Maps links (maps.app.goo.gl) through the helper, the OpenRouteService backup (no key added yet), national forest trails, and anything on a phone.
+
+## Roadmap
+
+Agreed, waiting: a polished README with screenshots (after the UI settles), merge shapes and draw-to-select.
+Offered, not yet approved: automated checks on GitHub (free), shareable links, save and reload a list.
 
 ## Run locally
 
 ```sh
-npm test      # converter and query-builder checks, no network needed
+npm test      # all checks, no network needed
 npm start     # serves the folder with `serve`
 ```
 
 ES modules need a server, so opening `index.html` from disk will not work.
 
-## Deploy to GitHub Pages at maps.robertyoushock.com
+## Deploy
 
-1. This repo is `robertyoushock/cairn`.
-2. Repo Settings, Pages: deploy from branch `main`, folder `/ (root)`. Add a `CNAME` file containing `maps.robertyoushock.com` only when the DNS record below is in place (it is left out during testing so the github.io test URL keeps working).
-3. In IONOS DNS for robertyoushock.com add a `CNAME` record: host `maps`, value `<your-github-username>.github.io`.
-4. Back in Pages, wait for the DNS check, then tick **Enforce HTTPS**.
-5. The "Source on GitHub" link in `index.html` already points at this repo.
+GitHub Pages, branch `main`, folder `/`. The page path follows the repo name and is case sensitive. The optional helper lives in `worker/` (see `worker/README.md`).
 
 ## Data notes
 

@@ -1,9 +1,23 @@
-# Cairn relay (optional)
+# Cairn helper (Cloudflare Worker)
 
-Only needed for sources marked `needsRelay` in `data/catalog.json` (today: DeFlock cameras).
+Deployed at `https://cairn-relay.robertyoushock.workers.dev` on Robert's Cloudflare account, **Workers Free plan**.
+Keep it on Free: over the daily allowance it returns errors, it never bills.
 
-1. Free Cloudflare account, then `npm i -g wrangler && wrangler login`
-2. In this folder: `wrangler deploy`
-3. Put the printed URL in `js/config.js` as `RELAY_URL`, commit, push.
+What it does: fetches DeFlock's camera file (which blocks browsers), expands short Google Maps links, and can
+proxy OpenRouteService directions if a key is added. See the comments at the top of `relay.js`.
 
-It only fetches hosts listed in `ALLOWED_HOSTS` and only answers the sites in `ALLOWED_ORIGINS`.
+## Updating it
+
+The code was pasted into the Cloudflare dashboard editor (Workers & Pages, cairn-relay, Edit code). After changing
+`relay.js` here, paste the new version there and press Deploy. Or, with Node installed: `npx wrangler deploy` from
+this folder.
+
+## Optional: routing key
+
+Routes already work without a key (FOSSGIS OSRM). For a second provider, create a free key at openrouteservice.org
+and add it in Cloudflare under the worker's Settings, Variables and Secrets, as a **Secret** named `ORS_KEY`.
+Never put the key in this repo.
+
+## If the site moves
+
+Add the new site address to `ALLOWED_ORIGINS` in `relay.js`, or every call will be refused.
