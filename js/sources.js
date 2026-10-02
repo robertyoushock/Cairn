@@ -449,7 +449,7 @@ export async function gunzipToText(res) {
   return new Response(stream).text();
 }
 
-export async function loadGeoJsonUrl({ url, gz = false, labelField = null, fixedLabel = null, bbox = null, limit = 50000, relay = '' }) {
+export async function loadGeoJsonUrl({ url, gz = false, labelField = null, fixedLabel = null, bbox = null, limit = 50000, relay = '', relayFirst = false }) {
   const attempt = async (u) => {
     const res = await fetch(u);
     if (!res.ok) throw new Error(`${new URL(u).host} answered ${res.status}.`);
@@ -457,7 +457,10 @@ export async function loadGeoJsonUrl({ url, gz = false, labelField = null, fixed
     return JSON.parse(text);
   };
   let json;
-  try {
+  const viaRelay = () => attempt(`${relay.replace(/\/+$/, '')}/?url=${encodeURIComponent(url)}`);
+  // Sources known to block browsers skip the doomed direct try.
+  if (relayFirst && relay) json = await viaRelay();
+  else try {
     json = await attempt(url);
   } catch (e) {
     if (!relay) {
@@ -466,7 +469,7 @@ export async function loadGeoJsonUrl({ url, gz = false, labelField = null, fixed
         'Anything that needs it is marked in the results.'
       );
     }
-    json = await attempt(`${relay.replace(/\/+$/, '')}/?url=${encodeURIComponent(url)}`);
+    json = await viaRelay();
   }
   let features = (json.type === 'FeatureCollection' ? json.features : json.features || []).filter((f) => f && f.geometry);
   if (bbox) {

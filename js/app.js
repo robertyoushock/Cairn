@@ -673,7 +673,7 @@ async function openDetail(d) {
       const r = await loadLayer({ url, limit: 300, bbox: big ? mapBbox() : null, generalize: big ? 0 : 0.003 });
       sample = r.fc.features;
     } else {
-      const r = await loadGeoJsonUrl({ url: entry.url, gz: !!entry.gz, labelField: entry.labelField, fixedLabel: entry.fixedLabel, limit: 300, bbox: big ? mapBbox() : null, relay: RELAY_URL });
+      const r = await loadGeoJsonUrl({ url: entry.url, gz: !!entry.gz, labelField: entry.labelField, fixedLabel: entry.fixedLabel, limit: 300, bbox: big ? mapBbox() : null, relay: RELAY_URL, relayFirst: !!entry.needsRelay });
       sample = r.fc.features;
       if (!entry.fixedLabel) setLabelOptions(labelChoices(sample[0]?.properties), entry.labelField);
     }
@@ -719,7 +719,7 @@ $('detail').addEventListener('submit', (e) => {
     if (d.cand || d.entry.type === 'arcgis') {
       r = await loadLayer({ url: d.cand ? d.cand.url : d.entry.url, where: $('l-where').value, bbox, limit, labelField, labelPrefix: prefixFor(d, labelField), onProgress });
     } else {
-      r = await loadGeoJsonUrl({ url: d.entry.url, gz: !!d.entry.gz, labelField, fixedLabel: d.entry.fixedLabel, bbox, limit, relay: RELAY_URL });
+      r = await loadGeoJsonUrl({ url: d.entry.url, gz: !!d.entry.gz, labelField, fixedLabel: d.entry.fixedLabel, bbox, limit, relay: RELAY_URL, relayFirst: !!d.entry.needsRelay });
     }
     if (!r.fc.features.length) return status('Nothing matched. Try clearing the filter or zooming out.', 'error');
     const base = d.cand ? d.cand.url : d.entry.url;
