@@ -175,7 +175,7 @@ function renderList() {
     list.append(el('li', {}, el('span', { className: 'name' }, zoomBtn, el('br'), el('span', { className: 'kind', textContent: kindOf(f) })), remove));
   });
   if (shown.length > 100) list.append(el('li', { textContent: `…and ${(shown.length - 100).toLocaleString()} more.${q ? '' : ' They will all be in the download.'}` }));
-  if (q && !shown.length) list.append(el('li', { textContent: 'Nothing in your list matches. The filter looks at names and every detail, including state.' }));
+  if (q && n && !shown.length) list.append(el('li', { textContent: 'Nothing in your list matches. The filter looks at names and every detail, including state.' }));
 
   const narrowed = q && shown.length > 0 && shown.length < n;
   $('filter-actions').hidden = !narrowed;
@@ -650,7 +650,7 @@ async function openDetail(d) {
         setLabelOptions(pickLabelFields(info.fields, info.displayField), entry.labelField);
         sel.value = entry.labelField || sel.value;
       }
-      const r = await loadLayer({ url, limit: 300, bbox: big ? mapBbox() : null });
+      const r = await loadLayer({ url, limit: 300, bbox: big ? mapBbox() : null, offset: big ? 0 : 0.003 });
       sample = r.fc.features;
     } else {
       const r = await loadGeoJsonUrl({ url: entry.url, gz: !!entry.gz, labelField: entry.labelField, fixedLabel: entry.fixedLabel, limit: 300, relay: RELAY_URL });
