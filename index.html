@@ -61,7 +61,7 @@
           <div class="row">
             <button type="submit" class="primary" id="detail-add">Add to my list</button>
           </div>
-          <details>
+          <details id="detail-limit">
             <summary>Filter or limit what gets added</summary>
             <label>Filter (SQL, optional)
               <input id="l-where" type="text" value="1=1" spellcheck="false">
@@ -75,6 +75,7 @@
               </select>
             </label>
           </details>
+          <a id="detail-report" class="linkish" target="_blank" rel="noopener noreferrer" href="#">Something wrong with this result? Report it</a>
         </form>
 
         <div id="here" class="here" hidden>
@@ -115,6 +116,15 @@
       <section class="step" aria-labelledby="h-list">
         <h2 id="h-list"><span class="n">2</span> Check your list</h2>
         <p id="empty" class="lead">Nothing yet. Click the map or choose a type above.</p>
+        <div id="list-filter-wrap" class="stack" hidden>
+          <label class="sr" for="list-filter">Filter your list</label>
+          <input id="list-filter" type="search" placeholder="Filter by name or state, like Colorado" autocomplete="off">
+          <div class="row" id="filter-actions" hidden>
+            <span id="filter-count"></span>
+            <button type="button" id="filter-keep" class="quiet">Keep only these</button>
+            <button type="button" id="filter-remove" class="quiet">Remove these</button>
+          </div>
+        </div>
         <ul id="feature-list" class="rows" hidden></ul>
         <div class="row" id="list-actions" hidden>
           <span id="count"></span>
@@ -136,6 +146,28 @@
             <label class="fmt"><input type="radio" name="fmt" value="geojson">
               <span><strong>Mapping software or code</strong><small>GeoJSON works in QGIS, ArcGIS and web maps.</small></span></label>
           </fieldset>
+          <details id="look" class="tucked">
+            <summary>Colors, labels and file size</summary>
+            <div class="swatches">
+              <label>Outline <input type="color" id="k-line" value="#0a4349"></label>
+              <label>Fill <input type="color" id="k-fill" value="#ffc933"></label>
+              <label class="inline">Width
+                <select id="k-width"><option>1</option><option selected>2</option><option>3</option><option>5</option></select>
+              </label>
+            </div>
+            <label>Fill strength
+              <input type="range" id="k-opacity" min="0" max="100" value="30">
+            </label>
+            <label class="check"><input type="checkbox" id="k-labels"> Show each name on the map in Google Earth</label>
+            <label class="check"><input type="checkbox" id="k-attrs" checked> Include each item&rsquo;s details (attributes)</label>
+            <label>Shape detail
+              <select id="x-detail"></select>
+              <small>Less detail makes a smaller file. Corners get slightly rounded off; nothing is removed.</small>
+            </label>
+            <small>Colors and labels are saved in Google Earth files (KML and KMZ).</small>
+          </details>
+          <p id="size-note" class="lead"></p>
+          <p id="size-warn" class="warn" hidden></p>
           <label>File name
             <input id="x-name" type="text" value="cairn-export" spellcheck="false">
           </label>
@@ -145,7 +177,7 @@
 
       <footer class="foot">
         <p id="source-note"></p>
-        <p>Address search by Esri and OpenStreetMap.</p>
+        <p><a href="credits.html">Credits and data sources</a></p>
         <p>Free and open source. <a href="https://github.com/robertyoushock/cairn" id="gh-link">Source on GitHub</a></p>
       </footer>
     </aside>

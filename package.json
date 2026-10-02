@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Find US ZIP codes, districts and ArcGIS layers and export KML, KMZ, GPX or GeoJSON.",
   "scripts": {
-    "test": "node test/convert.test.mjs && node test/sources.test.mjs && node test/basemap.test.mjs && node test/search.test.mjs && node test/relay.test.mjs",
+    "test": "node test/convert.test.mjs && node test/sources.test.mjs && node test/basemap.test.mjs && node test/search.test.mjs && node test/relay.test.mjs && node test/export.test.mjs",
     "start": "npx --yes serve ."
   },
   "license": "MIT"

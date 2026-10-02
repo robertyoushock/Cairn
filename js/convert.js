@@ -62,27 +62,90 @@ export function kmlGeometry(g) {
   }
 }
 
-export function geojsonToKml(fc, docName = 'Export') {
+// "#rrggbb" plus opacity 0..1 -> KML's aabbggrr.
+export function kmlColor(hex, opacity = 1) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '') || [, '1f', '4f', 'e2'];
+  const a = Math.round(Math.max(0, Math.min(1, opacity)) * 255).toString(16).padStart(2, '0');
+  return (a + m[3] + m[2] + m[1]).toLowerCase();
+}
+
+// A point guaranteed to sit on the shape's biggest part, used to pin a name label to an area or line.
+export function labelPoint(g) {
+  if (!g) return null;
+  if (g.type === 'Point') return g.coordinates;
+  if (g.type === 'LineString') return g.coordinates[Math.floor(g.coordinates.length / 2)];
+  if (g.type === 'MultiLineString') return labelPoint({ type: 'LineString', coordinates: g.coordinates.reduce((a, b) => (b.length > a.length ? b : a)) });
+  const ringBox = (ring) => {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const c of ring) { if (c[0] < x0) x0 = c[0]; if (c[0] > x1) x1 = c[0]; if (c[1] < y0) y0 = c[1]; if (c[1] > y1) y1 = c[1]; }
+    return [x0, y0, x1, y1];
+  };
+  if (g.type === 'Polygon' || g.type === 'MultiPolygon') {
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+    let best = null, bestArea = -1;
+    for (const p of polys) {
+      const b = ringBox(p[0]);
+      const area = (b[2] - b[0]) * (b[3] - b[1]);
+      if (area > bestArea) { bestArea = area; best = p[0]; }
+    }
+    if (!best) return null;
+    // Scan across the middle of the ring and take the midpoint of the widest inside stretch,
+    // so the label lands inside even for C-shaped areas.
+    const b = ringBox(best);
+    const y = (b[1] + b[3]) / 2;
+    const xs = [];
+    for (let i = 0; i < best.length - 1; i++) {
+      const [x1, y1] = best[i];
+      const [x2, y2] = best[i + 1];
+      if ((y1 > y) !== (y2 > y)) xs.push(x1 + ((y - y1) / (y2 - y1)) * (x2 - x1));
+    }
+    xs.sort((p, q) => p - q);
+    let span = -1, x = (b[0] + b[2]) / 2;
+    for (let i = 0; i + 1 < xs.length; i += 2) if (xs[i + 1] - xs[i] > span) { span = xs[i + 1] - xs[i]; x = (xs[i] + xs[i + 1]) / 2; }
+    return [x, y];
+  }
+  if (g.type === 'MultiPoint') return g.coordinates[0];
+  if (g.type === 'GeometryCollection') return labelPoint(g.geometries[0]);
+  return null;
+}
+
+export const KML_DEFAULTS = { line: '#1f4fe2', fill: '#1f4fe2', fillOpacity: 0.25, width: 2, labels: false, attributes: true };
+
+export function geojsonToKml(fc, docName = 'Export', options = {}) {
+  const o = { ...KML_DEFAULTS, ...options };
   const feats = fc.features || [];
   const placemarks = feats
     .map((f, i) => {
       const p = f.properties || {};
-      const data = Object.entries(p)
-        .filter(([, v]) => v !== null && v !== undefined && typeof v !== 'object')
+      const data = !o.attributes ? '' : Object.entries(p)
+        .filter(([k, v]) => !k.startsWith('_') && v !== null && v !== undefined && typeof v !== 'object')
         .map(([k, v]) => `<Data name="${esc(k)}"><value>${esc(v)}</value></Data>`)
         .join('');
+      let geom = kmlGeometry(f.geometry);
+      // Google Earth only draws a name next to a point, so areas and lines get an invisible pin to carry the label.
+      if (o.labels && f.geometry && f.geometry.type !== 'Point' && f.geometry.type !== 'MultiPoint') {
+        const lp = labelPoint(f.geometry);
+        if (lp && lp.every(Number.isFinite)) {
+          const inner = geom.startsWith('<MultiGeometry>') ? geom.slice(15, -16) : geom;
+          geom = `<MultiGeometry><Point><coordinates>${kmlCoord(lp)}</coordinates></Point>${inner}</MultiGeometry>`;
+        }
+      }
       return (
         `<Placemark><name>${esc(featureName(f, i))}</name>` +
         (data ? `<ExtendedData>${data}</ExtendedData>` : '') +
-        `<styleUrl>#s</styleUrl>${kmlGeometry(f.geometry)}</Placemark>`
+        `<styleUrl>#s</styleUrl>${geom}</Placemark>`
       );
     })
     .join('\n');
+  const hasPoints = feats.some((f) => f.geometry && /Point$/.test(f.geometry.type));
+  // With labels on, pins on areas are hidden (scale 0) unless the data has real points to show.
+  const icon = `<IconStyle><color>${kmlColor(o.line, 1)}</color><scale>${hasPoints ? 1 : 0}</scale></IconStyle>`;
   return clean(
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
       `<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${esc(docName)}</name>` +
-      `<Style id="s"><LineStyle><color>ff1f4fe2</color><width>2</width></LineStyle>` +
-      `<PolyStyle><color>401f4fe2</color></PolyStyle></Style>\n${placemarks}\n</Document></kml>\n`
+      `<Style id="s">${icon}<LabelStyle><scale>${o.labels || hasPoints ? 1 : 0}</scale></LabelStyle>` +
+      `<LineStyle><color>${kmlColor(o.line, 1)}</color><width>${Number(o.width) || 2}</width></LineStyle>` +
+      `<PolyStyle><color>${kmlColor(o.fill, o.fillOpacity)}</color></PolyStyle></Style>\n${placemarks}\n</Document></kml>\n`
   );
 }
 

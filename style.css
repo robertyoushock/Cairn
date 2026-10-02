@@ -213,3 +213,15 @@ label.fmt small { display: block; }
 .src { display: inline-flex; align-items: center; gap: 4px; padding: 0 12px; border-left: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; }
 .src:hover, .src:focus-visible { background: var(--tape-soft); color: var(--ink); }
 .src.inline { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }
+
+/* ---- List filter, export look ---- */
+#list-filter-wrap { margin-bottom: 8px; }
+#filter-actions { flex-wrap: wrap; gap: 6px; }
+.tucked { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; background: #fff; }
+.tucked > * + * { margin-top: 10px; }
+.tucked summary { cursor: pointer; font-weight: 700; }
+.swatches { display: flex; gap: 14px; flex-wrap: wrap; align-items: end; }
+.swatches input[type='color'] { display: block; width: 46px; height: 32px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+input[type='range'] { width: 100%; }
+#size-note { margin: 0; }
+#detail-report { font-size: 13px; }

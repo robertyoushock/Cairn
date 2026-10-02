@@ -27,7 +27,18 @@ assert.equal(tx.input, '');
 assert.match(tx.title, /Texas state house districts/);
 assert.equal(boundaryResult('state house').kind, 'boundary-form', 'no state: ask for one');
 assert.equal(boundaryResult('zip codes colorado').kind, 'boundary-form', 'whole-state ZIP lists are not possible');
-assert.equal(boundaryResult('school districts'), null);
+assert.equal(boundaryResult('school districts').kind, 'boundary-form');
+assert.equal(boundaryResult('fire stations'), null);
+const sd = boundaryResult('school districts colorado');
+assert.deepEqual([sd.kind, sd.type, sd.state, sd.input, !!sd.loose], ['boundary', 'school', '08', '', false]);
+const bc = boundaryResult('boulder city limits colorado');
+assert.deepEqual([bc.type, bc.input, bc.loose], ['place', 'boulder', true]);
+assert.equal(boundaryResult('denver city limits').kind, 'boundary-form');
+assert.equal(boundaryResult('denver city limits').input, 'denver', 'name is carried into the form');
+assert.equal(boundaryResult('census tracts colorado').type, 'tract');
+const pj = boundaryResult('parcels jefferson county colorado');
+assert.equal(pj.loose, true, 'extra words keep the wider search running');
+assert.equal(boundaryResult('counties in Ohio').loose, false);
 
 // ---- catalog search ----
 const cat = JSON.parse(fs.readFileSync(new URL('../data/catalog.json', import.meta.url)));

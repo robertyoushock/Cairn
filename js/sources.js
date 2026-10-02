@@ -54,6 +54,35 @@ export const BOUNDARY_TYPES = {
     hint: 'Enter district numbers separated by commas. Leave blank for the whole state.',
     placeholder: '1, 2',
   },
+  place: {
+    label: 'Cities and towns',
+    service: 'Places_CouSub_ConCity_SubMCD',
+    layer: /^Incorporated Places$/i,
+    needsState: true,
+    byName: true,
+    hint: 'Enter city or town names separated by commas. Leave blank for every city in the state.',
+    placeholder: 'Denver, Boulder',
+  },
+  school: {
+    label: 'School districts',
+    service: 'School',
+    layer: /^Unified School Districts$/i,
+    // Some states split districts into elementary and secondary instead of unified, so ask all three.
+    alsoLayers: [/^Secondary School Districts$/i, /^Elementary School Districts$/i],
+    needsState: true,
+    byName: true,
+    contains: true,
+    hint: 'Enter part of a district name, like Jefferson. Leave blank for every district in the state.',
+    placeholder: 'Jefferson, Cherry Creek',
+  },
+  tract: {
+    label: 'Census tracts',
+    service: 'Tracts_Blocks',
+    layer: /^Census Tracts$/i,
+    needsState: true,
+    hint: 'Enter tract numbers like 34.02, separated by commas. Leave blank for the whole state (first 2,000).',
+    placeholder: '34.02, 36.02',
+  },
   county: {
     label: 'Counties',
     service: 'State_County',
@@ -82,8 +111,8 @@ export async function getJson(url, init) {
 
 const layerCache = new Map();
 
-async function resolveLayer(type) {
-  const t = BOUNDARY_TYPES[type];
+async function resolveLayer(type, layerRe = null) {
+  const t = { ...BOUNDARY_TYPES[type], ...(layerRe ? { layer: layerRe } : {}) };
   const key = `${t.service}|${t.layer}`;
   if (layerCache.has(key)) return layerCache.get(key);
   const svc = await getJson(`${TIGER}/${t.service}/MapServer?f=json`);
@@ -126,8 +155,15 @@ function buildWhere(type, layer, state, input) {
     parts.push(`STATE = ${sqlStr(state)}`);
   }
   if (items.length) {
-    if (type === 'county') {
-      parts.push('(' + items.map((n) => `UPPER(BASENAME) LIKE ${sqlStr(n.toUpperCase().replace(/ COUNTY$/, '') + '%')}`).join(' OR ') + ')');
+    if (type === 'county' || t.byName) {
+      const tidy = (n) => n.toUpperCase().replace(/ (COUNTY|CITY|TOWN)$/, '');
+      parts.push('(' + items.map((n) => `UPPER(BASENAME) LIKE ${sqlStr((t.contains ? '%' : '') + tidy(n) + '%')}`).join(' OR ') + ')');
+    } else if (type === 'tract') {
+      const vals = items.map((n) => {
+        if (!/^\d{1,4}(\.\d{1,2})?$/.test(n)) throw new Error(`"${n}" is not a tract number. They look like 34.02.`);
+        return sqlStr(n);
+      });
+      parts.push(`BASENAME IN (${vals.join(',')})`);
     } else {
       // Congressional layers name the field after the session (CD120, CD119...); CDSESSN is not it.
       const field = layer.fields.find((f) => (type === 'cd' ? /^CD\d+$/.test(f) : f === t.fieldPrefix));
@@ -151,7 +187,7 @@ export function decorate(type, f) {
 }
 
 const ZIP_FIELDS = 'GEOID,BASENAME,NAME,AREALAND,AREAWATER,INTPTLAT,INTPTLON,POP100,HU100';
-const ID_ORDER = ['zip', 'sldl', 'sldu', 'cd', 'county'];
+const ID_ORDER = ['zip', 'place', 'school', 'sldl', 'sldu', 'cd', 'county'];
 
 // What boundaries cover this exact point? Asks every Census layer at once; a layer that fails is skipped.
 export async function identifyAt(lng, lat) {
@@ -183,35 +219,42 @@ export async function identifyAt(lng, lat) {
 }
 
 export async function queryBoundaries({ type, state, input, bbox }) {
-  const layer = await resolveLayer(type);
-  let where = buildWhere(type, layer, state, input);
-  if (where === null) {
-    if (!bbox) throw new Error('Enter at least one ZIP code, or tick "Only what is in the map view".');
-    where = '1=1';
-  }
-  const params = new URLSearchParams({
-    where,
-    // The ZCTA layer's ZCTA5 column breaks "*" queries, so ask for fields by name there.
-    outFields: type === 'zip' ? ZIP_FIELDS : '*',
-    outSR: '4326',
-    returnGeometry: 'true',
-    geometryPrecision: '6',
-    resultRecordCount: '2000',
-    f: 'geojson',
-  });
-  if (bbox) {
-    params.set('geometry', bbox.join(','));
-    params.set('geometryType', 'esriGeometryEnvelope');
-    params.set('inSR', '4326');
-    params.set('spatialRel', 'esriSpatialRelIntersects');
-  }
-  const fc = await getJson(`${layer.url}/query`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params,
-  });
-  fc.features = (fc.features || []).map((f) => decorate(type, f));
-  return { fc, source: `US Census Bureau TIGERweb, ${layer.name}` };
+  const t = BOUNDARY_TYPES[type];
+  const run = async (layerRe) => {
+    const layer = await resolveLayer(type, layerRe);
+    let where = buildWhere(type, layer, state, input);
+    if (where === null) {
+      if (!bbox) throw new Error('Enter at least one ZIP code, or tick "Only what is in the map view".');
+      where = '1=1';
+    }
+    const params = new URLSearchParams({
+      where,
+      // The ZCTA layer's ZCTA5 column breaks "*" queries, so ask for fields by name there.
+      outFields: type === 'zip' ? ZIP_FIELDS : '*',
+      outSR: '4326',
+      returnGeometry: 'true',
+      geometryPrecision: '6',
+      resultRecordCount: '2000',
+      f: 'geojson',
+    });
+    if (bbox) {
+      params.set('geometry', bbox.join(','));
+      params.set('geometryType', 'esriGeometryEnvelope');
+      params.set('inSR', '4326');
+      params.set('spatialRel', 'esriSpatialRelIntersects');
+    }
+    const fc = await getJson(`${layer.url}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params,
+    });
+    return { features: (fc.features || []).map((f) => decorate(type, f)), name: layer.name };
+  };
+  const main = await run(null);
+  // Extra layers are a bonus: if one fails, keep what the main layer returned.
+  const extra = await Promise.all((t.alsoLayers || []).map((re) => run(re).catch(() => ({ features: [] }))));
+  const features = [main, ...extra].flatMap((r) => r.features);
+  return { fc: { type: 'FeatureCollection', features }, source: `US Census Bureau TIGERweb, ${main.name}` };
 }
 
 // ---------- Generic ArcGIS ----------
@@ -264,7 +307,7 @@ export async function inspectUrl(rawUrl) {
   throw new Error('That URL did not look like an ArcGIS REST service, layer or services folder.');
 }
 
-export async function loadLayer({ url, where = '1=1', bbox = null, limit = 10000, labelField = null, onProgress = () => {} }) {
+export async function loadLayer({ url, where = '1=1', bbox = null, limit = 10000, labelField = null, labelPrefix = '', onProgress = () => {} }) {
   const info = await getJson(`${url}?f=json`);
   const pageSize = Math.min(info.maxRecordCount || 1000, 2000);
   const features = [];
@@ -314,7 +357,7 @@ export async function loadLayer({ url, where = '1=1', bbox = null, limit = 10000
     offset += (fc.features || []).length;
   }
   const out = features.slice(0, limit);
-  if (labelField) applyLabels(out, labelField);
+  if (labelField) applyLabels(out, labelField, null, labelPrefix);
   return {
     fc: { type: 'FeatureCollection', features: out },
     truncated,
@@ -378,10 +421,10 @@ export async function searchPlaces(text) {
 // ---------- Labels and plain GeoJSON sources ----------
 
 // Name every feature from one chosen field so lists and maps are readable.
-export function applyLabels(features, labelField, fixedLabel = null) {
+export function applyLabels(features, labelField, fixedLabel = null, prefix = '') {
   features.forEach((f, i) => {
     const p = (f.properties = f.properties || {});
-    const v = fixedLabel || (labelField && p[labelField] != null && String(p[labelField]).trim() !== '' ? String(p[labelField]) : null);
+    const v = fixedLabel || (labelField && p[labelField] != null && String(p[labelField]).trim() !== '' ? prefix + String(p[labelField]) : null);
     p.name = v || `${fixedLabel || 'Feature'} ${i + 1}`;
   });
   return features;

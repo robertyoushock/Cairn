@@ -24,6 +24,20 @@ globalThis.fetch = async (url, init) => {
       { id: 3, name: 'Counties', parentLayerId: -1, type: 'Feature Layer', maxScale: 42001 },
     ] });
   if (u.includes('/State_County/MapServer/1?f=json')) return json({ fields: [{ name: 'BASENAME' }, { name: 'STATE' }] });
+  if (u.includes('/School/MapServer?f=json'))
+    return json({ layers: [
+      { id: 0, name: 'Unified School Districts', parentLayerId: -1, type: 'Feature Layer', maxScale: 1001 },
+      { id: 1, name: 'Secondary School Districts', parentLayerId: -1, type: 'Feature Layer', maxScale: 1001 },
+      { id: 2, name: 'Elementary School Districts', parentLayerId: -1, type: 'Feature Layer', maxScale: 1001 },
+      { id: 5, name: 'Unified School Districts', parentLayerId: 4, type: 'Feature Layer', maxScale: 1001 },
+    ] });
+  if (/\/School\/MapServer\/[012]\?f=json/.test(u)) return json({ fields: [{ name: 'BASENAME' }, { name: 'STATE' }] });
+  if (u.includes('/Places_CouSub_ConCity_SubMCD/MapServer?f=json'))
+    return json({ layers: [{ id: 4, name: 'Incorporated Places', parentLayerId: -1, type: 'Feature Layer', maxScale: 1001 }, { id: 5, name: 'Census Designated Places', parentLayerId: -1, type: 'Feature Layer', maxScale: 1001 }] });
+  if (u.includes('/Places_CouSub_ConCity_SubMCD/MapServer/4?f=json')) return json({ fields: [{ name: 'BASENAME' }, { name: 'STATE' }] });
+  if (u.includes('/Tracts_Blocks/MapServer?f=json'))
+    return json({ layers: [{ id: 0, name: 'Census Tracts', parentLayerId: -1, type: 'Feature Layer', maxScale: 1001 }] });
+  if (u.includes('/Tracts_Blocks/MapServer/0?f=json')) return json({ fields: [{ name: 'BASENAME' }, { name: 'STATE' }] });
   if (u.includes('PUMA_TAD_TAZ_UGA_ZCTA/MapServer?f=json'))
     return json({ layers: [{ id: 1, name: '2020 Census ZIP Code Tabulation Areas', parentLayerId: -1, type: 'Feature Layer', maxScale: 1001 }] });
   if (u.includes('PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1?f=json')) return json({ fields: [{ name: 'GEOID' }] });
@@ -53,6 +67,17 @@ assert.match(last().where, /UPPER\(BASENAME\) LIKE 'DENVER%'/);
 assert.match(last().where, /'O''BRIEN%'/);
 assert.ok(calls.some((c) => c.u.includes('/State_County/MapServer/1?f=json')), 'picked the most detailed county layer');
 
+await queryBoundaries({ type: 'place', input: 'Denver, Boulder city', state: '08', bbox: null });
+assert.equal(last().where, "STATE = '08' AND (UPPER(BASENAME) LIKE 'DENVER%' OR UPPER(BASENAME) LIKE 'BOULDER%')");
+const sdBefore = calls.length;
+const sdr = await queryBoundaries({ type: 'school', input: 'Jefferson', state: '08', bbox: null });
+assert.equal(last().where, "STATE = '08' AND (UPPER(BASENAME) LIKE '%JEFFERSON%')");
+assert.equal(calls.slice(sdBefore).filter((c) => c.u.endsWith("/query")).length, 3, 'unified, secondary and elementary are all asked');
+assert.equal(sdr.fc.features.length, 3);
+await queryBoundaries({ type: 'tract', input: '34.02', state: '08', bbox: null });
+assert.equal(last().where, "STATE = '08' AND BASENAME IN ('34.02')");
+await assert.rejects(() => queryBoundaries({ type: 'tract', input: 'abc', state: '08', bbox: null }), /not a tract number/);
+
 await queryBoundaries({ type: 'sldu', input: '', state: '08', bbox: [-105, 39, -104, 40] });
 assert.equal(last().where, "STATE = '08'");
 assert.equal(last().geometry, '-105,39,-104,40');
@@ -68,7 +93,7 @@ assert.equal(decorate('county', { properties: { GEOID: '08031', NAME: 'Denver Co
 const before = calls.length;
 const id = await identifyAt(-104.99, 39.74);
 const pointCalls = calls.slice(before).filter((c) => c.u.endsWith('/query'));
-assert.equal(pointCalls.length, 5);
+assert.equal(pointCalls.length, 7);
 assert.ok(pointCalls.every((c) => c.body.geometryType === 'esriGeometryPoint' && c.body.geometry === '-104.99,39.74'));
 assert.equal(id.failed, 0);
 assert.ok(id.features.length >= 1 && id.features.every((f) => f.properties._key));

@@ -8,6 +8,8 @@ import { boundaryResult } from './intent.js';
 import { loadCatalog, searchCatalog } from './catalog.js';
 import { vetResults, pickLabelFields, displayTitle, describeCandidate, sourceLink } from './vet.js';
 import { RELAY_URL } from './config.js';
+import { DETAIL_LEVELS, simplifyCollection, countPoints, estimateBytes, prettyBytes, sizeWarnings } from './simplify.js';
+import { makeMatcher } from './listfilter.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -22,6 +24,9 @@ const KIND = {
   sldu: 'State senate district',
   cd: 'Congressional district',
   county: 'County',
+  place: 'City or town',
+  school: 'School district',
+  tract: 'Census tract',
 };
 const CARD_COPY = {
   zip: ['ZIP codes', 'Like 80202'],
@@ -29,6 +34,9 @@ const CARD_COPY = {
   sldu: ['State senate districts', 'Your state senator'],
   cd: ['Congressional districts', 'Your U.S. House seat'],
   county: ['Counties', 'Like Denver County'],
+  place: ['Cities and towns', 'City limits'],
+  school: ['School districts', 'Like Jeffco Schools'],
+  tract: ['Census tracts', 'Small statistical areas'],
 };
 
 // ---------- Map ----------
@@ -107,7 +115,9 @@ function kindOf(f) {
   return KIND[f.properties?._type] || f.properties?._layer || 'Map feature';
 }
 
+let selectionVersion = 0;
 function renderSelection() {
+  selectionVersion++;
   const feats = [...selection.values()];
   const fc = { type: 'FeatureCollection', features: feats };
   whenReady(() => map.getSource('data').setData(fc));
@@ -120,18 +130,10 @@ function renderSelection() {
   $('mode-count').textContent = n ? `(${n.toLocaleString()})` : '';
   $('mode-list').disabled = n === 0;
   if (n === 0 && mode === 'list') setMode('spot');
-
-  const list = $('feature-list');
-  list.replaceChildren();
-  feats.slice(0, 100).forEach((f) => {
-    const zoomBtn = el('button', { type: 'button', textContent: featureName(f), title: 'Zoom to this' });
-    zoomBtn.addEventListener('click', () => fit(bboxOf({ features: [f] })));
-    const remove = el('button', { type: 'button', className: 'act remove', textContent: 'Remove' });
-    remove.setAttribute('aria-label', `Remove ${featureName(f)}`);
-    remove.addEventListener('click', () => { selection.delete(f.properties._key); renderSelection(); refreshHere(); });
-    list.append(el('li', {}, el('span', { className: 'name' }, zoomBtn, el('br'), el('span', { className: 'kind', textContent: kindOf(f) })), remove));
-  });
-  if (n > 100) list.append(el('li', { textContent: `…and ${(n - 100).toLocaleString()} more. They will all be in the download.` }));
+  // A filter is only worth showing once the list is long enough to get lost in.
+  if (n <= 5 && $('list-filter').value) $('list-filter').value = '';
+  $('list-filter-wrap').hidden = n <= 5;
+  renderList();
 
   if (!nameTouched) {
     const types = new Set(feats.map((f) => f.properties?._type));
@@ -141,6 +143,55 @@ function renderSelection() {
   }
   updateDownload();
 }
+
+// The rows under "Check your list", narrowed by the filter box when it has text.
+function matchingFeatures() {
+  const q = $('list-filter').value.trim();
+  const feats = [...selection.values()];
+  return { q, feats, shown: q ? feats.filter(makeMatcher(q)) : feats };
+}
+
+function renderList() {
+  const { q, feats, shown } = matchingFeatures();
+  const n = feats.length;
+  const list = $('feature-list');
+  list.replaceChildren();
+  shown.slice(0, 100).forEach((f) => {
+    const zoomBtn = el('button', { type: 'button', textContent: featureName(f), title: 'Zoom to this' });
+    zoomBtn.addEventListener('click', () => fit(bboxOf({ features: [f] })));
+    const remove = el('button', { type: 'button', className: 'act remove', textContent: 'Remove' });
+    remove.setAttribute('aria-label', `Remove ${featureName(f)}`);
+    remove.addEventListener('click', () => { selection.delete(f.properties._key); renderSelection(); refreshHere(); });
+    list.append(el('li', {}, el('span', { className: 'name' }, zoomBtn, el('br'), el('span', { className: 'kind', textContent: kindOf(f) })), remove));
+  });
+  if (shown.length > 100) list.append(el('li', { textContent: `…and ${(shown.length - 100).toLocaleString()} more.${q ? '' : ' They will all be in the download.'}` }));
+  if (q && !shown.length) list.append(el('li', { textContent: 'Nothing in your list matches. The filter looks at names and every detail, including state.' }));
+
+  const narrowed = q && shown.length > 0 && shown.length < n;
+  $('filter-actions').hidden = !narrowed;
+  $('filter-count').textContent = narrowed ? `${shown.length.toLocaleString()} of ${n.toLocaleString()} match` : '';
+  // Outline the matches on the map so it is clear what "Keep only these" will keep.
+  if (mode !== 'spot' || q) whenReady(() => map.getSource('preview').setData(narrowed && shown.length <= 500 ? { type: 'FeatureCollection', features: shown } : EMPTY));
+}
+
+let filterTimer = 0;
+$('list-filter').addEventListener('input', () => { clearTimeout(filterTimer); filterTimer = setTimeout(renderList, 150); });
+$('filter-keep').addEventListener('click', () => {
+  const { shown } = matchingFeatures();
+  const keep = new Set(shown.map((f) => f.properties._key));
+  for (const k of [...selection.keys()]) if (!keep.has(k)) selection.delete(k);
+  $('list-filter').value = '';
+  renderSelection(); refreshHere();
+  fit(bboxOf({ features: shown }));
+  status(`Kept ${plural(shown.length, 'item', 'items')}.`);
+});
+$('filter-remove').addEventListener('click', () => {
+  const { shown } = matchingFeatures();
+  shown.forEach((f) => selection.delete(f.properties._key));
+  $('list-filter').value = '';
+  renderSelection(); refreshHere();
+  status(`Removed ${plural(shown.length, 'item', 'items')}.`);
+});
 
 $('clear').addEventListener('click', () => { selection.clear(); renderSelection(); refreshHere(); status('List cleared.'); });
 
@@ -354,7 +405,7 @@ function chooseType(type) {
   $('t-state-wrap').hidden = !t.needsState;
   $('t-input').placeholder = t.placeholder;
   $('t-hint').textContent = t.hint;
-  $('t-label').textContent = type === 'county' ? 'County names' : type === 'zip' ? 'ZIP codes' : 'District numbers';
+  $('t-label').textContent = { county: 'County names', zip: 'ZIP codes', place: 'City or town names', school: 'District names', tract: 'Tract numbers' }[type] || 'District numbers';
   $('t-input').focus();
 }
 $('type-cancel').addEventListener('click', () => chooseType(null));
@@ -440,7 +491,7 @@ $('find-form').addEventListener('submit', (e) => {
     $('r-verified-h').hidden = verified.hidden = nVerified === 0;
 
     // A clear Census match needs no ArcGIS hunt. Offer it, but do not make people wade through it.
-    if (b && b.kind === 'boundary') {
+    if (b && b.kind === 'boundary' && !b.loose) {
       $('r-more-h').hidden = true;
       const again = el('button', { type: 'button', className: 'linkish', textContent: 'Also look in ArcGIS Online' });
       again.addEventListener('click', () => { again.remove(); searchArcgis(text, token, cat); });
@@ -489,6 +540,7 @@ async function pickBoundary(b) {
   if (b.kind === 'boundary-form') {
     chooseType(b.type);
     if (b.state) stateSel.value = b.state;
+    if (b.input) $('t-input').value = b.input;
     $('type-form').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     return status(b.sub);
   }
@@ -502,6 +554,21 @@ async function pickBoundary(b) {
 }
 
 // ---------- Preview before adding ----------
+// Opens a ready-to-send GitHub issue so wrong labels and dead layers get reported with the details attached.
+function reportLink(title, url, query) {
+  const body = [
+    'What went wrong? (wrong names, empty, will not load, out of date, something else)',
+    '',
+    '',
+    '---',
+    `Result: ${title}`,
+    `Layer: ${url}`,
+    query ? `Search: ${query}` : '',
+  ].filter((l) => l !== null).join('\n');
+  const p = new URLSearchParams({ title: `Bad result: ${title}`, body, labels: 'bad-result' });
+  return `https://github.com/robertyoushock/cairn/issues/new?${p}`;
+}
+
 const labelChoices = (props) =>
   Object.entries(props || {})
     .filter(([k, v]) => typeof v === 'string' && v.trim() && !k.startsWith('_'))
@@ -528,7 +595,12 @@ async function openDetail(d) {
     notes.push('This source does not allow direct downloads from a web page, and the Cairn relay it needs is not turned on yet, so it cannot be added right now.');
     add.disabled = true;
   }
-  if (entry?.large || (cand && cand.count > 20000)) notes.push('This is a very large dataset. Tick "Only what is on the screen right now" under Filter, or zoom to your area first.');
+  const big = Boolean(entry?.large || (cand && cand.count > 20000));
+  // Huge datasets default to the current map view, so "Add" never tries to pull the whole country.
+  $('l-view').checked = big;
+  $('detail-limit').open = big;
+  if (big) notes.push(`This dataset is very large, so only what is on the screen right now will be added.${map.getZoom() < 8 ? ' Zoom in to your town or county first for a useful result.' : ''}`);
+  $('detail-report').href = reportLink(title, entry ? entry.url : cand.url, $('find-text').value.trim());
   if (notes.length) { warn.textContent = notes.join(' '); warn.hidden = false; }
   $('detail-sample').textContent = '';
   const sel = $('detail-label');
@@ -555,7 +627,7 @@ async function openDetail(d) {
         setLabelOptions(pickLabelFields(info.fields, info.displayField), entry.labelField);
         sel.value = entry.labelField || sel.value;
       }
-      const r = await loadLayer({ url, limit: 300, bbox: entry?.large ? mapBbox() : null });
+      const r = await loadLayer({ url, limit: 300, bbox: big ? mapBbox() : null });
       sample = r.fc.features;
     } else {
       const r = await loadGeoJsonUrl({ url: entry.url, gz: !!entry.gz, labelField: entry.labelField, fixedLabel: entry.fixedLabel, limit: 300, relay: RELAY_URL });
@@ -578,10 +650,12 @@ async function openDetail(d) {
   }
 }
 
+const prefixFor = (d, field) => (d.entry?.labelPrefix && field === d.entry.labelField ? d.entry.labelPrefix : '');
+
 function refreshSample() {
   if (!detail?.sample.length) return;
   const field = $('detail-label').value;
-  applyLabels(detail.sample, field || null, detail.entry?.fixedLabel || null);
+  applyLabels(detail.sample, field || null, detail.entry?.fixedLabel || null, prefixFor(detail, field));
   const names = detail.sample.slice(0, 3).map((f) => f.properties.name);
   $('detail-sample').textContent = `Shapes will be named like: ${names.join(', ')}`;
 }
@@ -599,7 +673,7 @@ $('detail').addEventListener('submit', (e) => {
     const onProgress = (n) => status(`Loaded ${n.toLocaleString()} so far…`, 'busy');
     let r;
     if (d.cand || d.entry.type === 'arcgis') {
-      r = await loadLayer({ url: d.cand ? d.cand.url : d.entry.url, where: $('l-where').value, bbox, limit, labelField, onProgress });
+      r = await loadLayer({ url: d.cand ? d.cand.url : d.entry.url, where: $('l-where').value, bbox, limit, labelField, labelPrefix: prefixFor(d, labelField), onProgress });
     } else {
       r = await loadGeoJsonUrl({ url: d.entry.url, gz: !!d.entry.gz, labelField, fixedLabel: d.entry.fixedLabel, bbox, limit, relay: RELAY_URL });
     }
@@ -646,15 +720,73 @@ $('url-form').addEventListener('submit', (e) => {
 // ---------- Download ----------
 const fmtLabel = { kml: 'KML', kmz: 'KMZ', gpx: 'GPX', geojson: 'GeoJSON' };
 const currentFmt = () => document.querySelector('input[name="fmt"]:checked').value;
+for (const [k, v] of Object.entries(DETAIL_LEVELS)) $('x-detail').add(new Option(v.label, k));
 
+const lookOptions = () => ({
+  line: $('k-line').value,
+  fill: $('k-fill').value,
+  fillOpacity: Number($('k-opacity').value) / 100,
+  width: Number($('k-width').value),
+  labels: $('k-labels').checked,
+  attributes: $('k-attrs').checked,
+});
+
+// What will actually be written: the list at the chosen detail level. Cached, since simplifying a big list takes a moment.
+let exportCache = { key: '', fc: null };
+function exportCollection() {
+  const level = $('x-detail').value;
+  const key = `${selectionVersion}|${level}`;
+  if (exportCache.key !== key) {
+    exportCache = { key, fc: simplifyCollection({ type: 'FeatureCollection', features: [...selection.values()] }, level) };
+  }
+  return exportCache.fc;
+}
+
+// Cairn's own bookkeeping fields (names starting with _) stay out of every file.
+const publicProps = (p, keep) => Object.fromEntries(Object.entries(p || {}).filter(([k]) => !k.startsWith('_') && (keep || k === 'name')));
+
+let sizeTimer = 0;
 function updateDownload() {
   const n = selection.size;
   const b = $('download');
   b.disabled = n === 0;
   b.textContent = n ? `Download ${fmtLabel[currentFmt()]} (${plural(n, 'item', 'items')})` : 'Add something to your list first';
+  $('size-note').textContent = '';
+  $('size-warn').hidden = true;
+  clearTimeout(sizeTimer);
+  if (!n) return;
+  sizeTimer = setTimeout(() => {
+    const fmt = currentFmt();
+    const fc = exportCollection();
+    const bytes = estimateBytes(fc, fmt, { attributes: $('k-attrs').checked });
+    const pts = countPoints(fc);
+    const full = $('x-detail').value === 'full' ? pts : countPoints({ features: [...selection.values()] });
+    const saved = full > pts ? ` (${Math.round((1 - pts / full) * 100)}% fewer points than full detail)` : '';
+    $('size-note').textContent = `About ${prettyBytes(bytes)} · ${pts.toLocaleString()} points${saved}`;
+    const warns = sizeWarnings(bytes, n, fmt);
+    if (warns.length && $('x-detail').value !== 'small') warns.push('Change "Shape detail" under Colors, labels and file size.');
+    $('size-warn').textContent = warns.join(' ');
+    $('size-warn').hidden = warns.length === 0;
+    if (warns.length) $('look').open = true;
+  }, 250);
 }
 document.querySelectorAll('input[name="fmt"]').forEach((r) => r.addEventListener('change', updateDownload));
+['x-detail', 'k-attrs'].forEach((id) => $(id).addEventListener('change', updateDownload));
 $('x-name').addEventListener('input', () => { nameTouched = true; });
+
+// The map follows the chosen colors so what you see is what Google Earth will show.
+function applyLook() {
+  const o = lookOptions();
+  whenReady(() => {
+    map.setPaintProperty('data-fill', 'fill-color', o.fill);
+    map.setPaintProperty('data-fill', 'fill-opacity', o.fillOpacity);
+    map.setPaintProperty('data-line', 'line-color', o.line);
+    map.setPaintProperty('data-line', 'line-width', o.width);
+    map.setPaintProperty('data-point', 'circle-color', o.fill);
+    map.setPaintProperty('data-point', 'circle-stroke-color', o.line);
+  });
+}
+['k-line', 'k-fill', 'k-opacity', 'k-width'].forEach((id) => $(id).addEventListener('input', applyLook));
 
 function download(blob, filename) {
   const a = el('a', { href: URL.createObjectURL(blob), download: filename });
@@ -670,13 +802,19 @@ $('export-form').addEventListener('submit', async (e) => {
   const fmt = currentFmt();
   const title = $('x-name').value.trim() || 'cairn-export';
   const base = title.replace(/[^\w.-]+/g, '-');
-  const fc = { type: 'FeatureCollection', features: [...selection.values()] };
+  const fc = exportCollection();
+  const look = lookOptions();
   try {
-    if (fmt === 'kml') download(new Blob([geojsonToKml(fc, title)], { type: 'application/vnd.google-earth.kml+xml' }), `${base}.kml`);
-    if (fmt === 'kmz') download(await kmlToKmz(geojsonToKml(fc, title), JSZip), `${base}.kmz`);
-    if (fmt === 'gpx') download(new Blob([geojsonToGpx(fc, title)], { type: 'application/gpx+xml' }), `${base}.gpx`);
-    if (fmt === 'geojson') download(new Blob([JSON.stringify(fc)], { type: 'application/geo+json' }), `${base}.geojson`);
-    status(`Downloaded ${base}.${fmt}.`);
+    let blob;
+    if (fmt === 'kml') blob = new Blob([geojsonToKml(fc, title, look)], { type: 'application/vnd.google-earth.kml+xml' });
+    if (fmt === 'kmz') blob = await kmlToKmz(geojsonToKml(fc, title, look), JSZip);
+    if (fmt === 'gpx') blob = new Blob([geojsonToGpx(fc, title)], { type: 'application/gpx+xml' });
+    if (fmt === 'geojson') {
+      const out = { type: 'FeatureCollection', features: fc.features.map((f) => ({ type: 'Feature', properties: publicProps(f.properties, look.attributes), geometry: f.geometry })) };
+      blob = new Blob([JSON.stringify(out)], { type: 'application/geo+json' });
+    }
+    download(blob, `${base}.${fmt}`);
+    status(`Downloaded ${base}.${fmt} (${prettyBytes(blob.size)}).`);
   } catch (err) {
     status(`Could not build the ${fmtLabel[fmt]} file: ${err.message}`, 'error');
   }
