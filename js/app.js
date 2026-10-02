@@ -594,7 +594,7 @@ function reportLink(title, url, query) {
 
 const labelChoices = (props) =>
   Object.entries(props || {})
-    .filter(([k, v]) => typeof v === 'string' && v.trim() && !k.startsWith('_'))
+    .filter(([k, v]) => typeof v === 'string' && v.trim() && !k.startsWith('_') && k !== 'name')
     .map(([k]) => ({ name: k, alias: k, score: 5 }));
 
 async function openDetail(d) {
@@ -637,9 +637,12 @@ async function openDetail(d) {
 
   const setLabelOptions = (opts, chosen) => {
     sel.replaceChildren();
-    opts.slice(0, 8).forEach((o) => sel.add(new Option(o.alias && o.alias !== o.name ? `${o.alias} (${o.name})` : o.name, o.name)));
+    // The pre-chosen field always makes the short list, even when the layer has dozens of fields ahead of it.
+    const picked = opts.find((o) => o.name === chosen);
+    const short = picked ? [picked, ...opts.filter((o) => o !== picked)].slice(0, 8) : opts.slice(0, 8);
+    short.forEach((o) => sel.add(new Option(o.alias && o.alias !== o.name ? `${o.alias} (${o.name})` : o.name, o.name)));
     sel.add(new Option('Just number them (Feature 1, 2…)', ''));
-    sel.value = chosen && opts.some((o) => o.name === chosen) ? chosen : opts[0]?.name ?? '';
+    sel.value = picked ? chosen : short[0]?.name ?? '';
   };
 
   if (cand) setLabelOptions(cand.labelOptions, cand.labelField);
@@ -659,7 +662,7 @@ async function openDetail(d) {
       const r = await loadLayer({ url, limit: 300, bbox: big ? mapBbox() : null, generalize: big ? 0 : 0.003 });
       sample = r.fc.features;
     } else {
-      const r = await loadGeoJsonUrl({ url: entry.url, gz: !!entry.gz, labelField: entry.labelField, fixedLabel: entry.fixedLabel, limit: 300, relay: RELAY_URL });
+      const r = await loadGeoJsonUrl({ url: entry.url, gz: !!entry.gz, labelField: entry.labelField, fixedLabel: entry.fixedLabel, limit: 300, bbox: big ? mapBbox() : null, relay: RELAY_URL });
       sample = r.fc.features;
       if (!entry.fixedLabel) setLabelOptions(labelChoices(sample[0]?.properties), entry.labelField);
     }
