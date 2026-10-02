@@ -138,6 +138,7 @@ function renderSelection() {
   $('empty').hidden = n > 0;
   $('feature-list').hidden = n === 0;
   $('list-actions').hidden = n === 0;
+  $('list-colors').hidden = n === 0;
   $('count').textContent = plural(n, 'item', 'items');
   $('mode-count').textContent = n ? `(${n.toLocaleString()})` : '';
   $('mode-list').disabled = n === 0;
@@ -247,7 +248,9 @@ async function identify(lng, lat) {
   lastSpot = { lng, lat };
   const token = ++hereToken;
   if (marker) marker.remove();
-  marker = new maplibregl.Marker({ color: '#0f5c63' }).setLngLat([lng, lat]).addTo(map);
+  // The spot marker is a little cairn, the same mark as the logo.
+  const cairnPin = el('img', { src: 'img/mark.svg', alt: '', className: 'cairn-pin', width: 34, height: 34 });
+  marker = new maplibregl.Marker({ element: cairnPin, anchor: 'bottom' }).setLngLat([lng, lat]).addTo(map);
   status('Looking up this spot…', 'busy');
   const { features, failed } = await identifyAt(lng, lat);
   if (token !== hereToken) return; // a newer click replaced this one
@@ -257,8 +260,7 @@ async function identify(lng, lat) {
     return;
   }
   status(failed ? 'Found most boundaries here. Some could not be loaded; click again to retry.' : 'Pick what you want from the list below. Hover a row to preview it.');
-  $('panel').classList.remove('collapsed');
-  $('panel-toggle').textContent = 'Hide panel';
+  setPanel(true);
   $('here').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
@@ -285,7 +287,7 @@ function setMode(m) {
   if (m === 'list') status('Click a shape on the map to inspect it, remove it, or keep only that one.');
   else if (m === 'route') {
     if (!$('route').open) $('route').open = true;
-    $('panel').classList.remove('collapsed');
+    setPanel(true);
     $('route').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     status('Click the map to add stops in the order you will travel.');
   } else status('Click anywhere on the map to see the boundaries at that spot.');
@@ -1064,7 +1066,7 @@ function updateDownload() {
     const saved = full > pts ? ` (${Math.round((1 - pts / full) * 100)}% fewer points than full detail)` : '';
     $('size-note').textContent = `About ${prettyBytes(bytes)} · ${pts.toLocaleString()} points${saved}`;
     const warns = sizeWarnings(bytes, n, fmt);
-    if (warns.length && $('x-detail').value !== 'small') warns.push('Change "Shape detail" under Colors, labels and file size.');
+    if (warns.length && $('x-detail').value !== 'small') warns.push('Change "Shape detail" under Labels, line width and file size.');
     $('size-warn').textContent = warns.join(' ');
     $('size-warn').hidden = warns.length === 0;
     if (warns.length) $('look').open = true;
@@ -1088,6 +1090,7 @@ function applyLook() {
   });
 }
 ['k-line', 'k-fill', 'k-opacity', 'k-width'].forEach((id) => $(id).addEventListener('input', applyLook));
+$('k-reset').addEventListener('click', () => { $('k-fill').value = '#ffc933'; $('k-line').value = '#0a4349'; applyLook(); });
 
 function download(blob, filename) {
   const a = el('a', { href: URL.createObjectURL(blob), download: filename });
@@ -1122,11 +1125,14 @@ $('export-form').addEventListener('submit', async (e) => {
 });
 
 // ---------- Mobile panel ----------
-$('panel-toggle').addEventListener('click', () => {
-  const collapsed = $('panel').classList.toggle('collapsed');
-  $('panel-toggle').textContent = collapsed ? 'Show panel' : 'Hide panel';
-  $('panel-toggle').setAttribute('aria-expanded', String(!collapsed));
+function setPanel(open) {
+  $('panel').classList.toggle('collapsed', !open);
+  document.querySelector('.app').classList.toggle('panel-closed', !open);
+  $('panel-toggle').textContent = open ? 'Map' : 'Menu';
+  $('panel-toggle').setAttribute('aria-expanded', String(open));
+  $('panel-toggle').setAttribute('aria-label', open ? 'Hide the menu and show the whole map' : 'Show the menu');
   map.resize();
-});
+}
+$('panel-toggle').addEventListener('click', () => setPanel($('panel').classList.contains('collapsed')));
 
 renderSelection();

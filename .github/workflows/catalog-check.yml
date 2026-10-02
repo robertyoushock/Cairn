@@ -1,0 +1,38 @@
+# Once a week, opens every verified source the way a visitor's browser would and files an issue if one has
+# moved, emptied out or lost its name field. Free for public repositories; needs no secrets beyond the built-in token.
+name: Catalog check
+on:
+  schedule:
+    - cron: '17 14 * * 1' # Mondays, 14:17 UTC
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check every source
+        id: check
+        run: node scripts/check-catalog.mjs > report.md
+        continue-on-error: true
+      - name: Show the report
+        run: cat report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: File or update an issue when something is broken
+        if: steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing=$(gh issue list --state open --search "Catalog check: sources need attention in:title" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file report.md
+          else
+            gh issue create --title "Catalog check: sources need attention" --body-file report.md
+          fi
+      - name: Mark the run as failed
+        if: steps.check.outcome == 'failure'
+        run: exit 1

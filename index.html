@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cairn</title>
   <meta name="description" content="Click the map to get the ZIP code, district or county boundary you need, then download it for Google Earth, GPS apps or GIS software. Free.">
+  <link rel="icon" href="img/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <meta name="theme-color" content="#f8f9f7">
+  <meta property="og:title" content="Cairn: find and download US map boundaries">
+  <meta property="og:description" content="Search in plain words, check it on the map, download for Google Earth, GPS apps or GIS. Free, no account.">
+  <meta property="og:image" content="https://robertyoushock.com/cairn/img/social.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -15,7 +23,7 @@
   <div class="app">
     <aside class="panel" id="panel">
       <header class="brand">
-        <h1>Cairn</h1>
+        <h1><img src="img/mark.svg" alt="" width="30" height="30"> Cairn</h1>
         <p>Get the boundary you need and download it for Google Earth, GPS apps or mapping software.</p>
       </header>
 
@@ -157,6 +165,11 @@
           </div>
         </div>
         <ul id="feature-list" class="rows" hidden></ul>
+        <div class="colors" id="list-colors" hidden>
+          <label><input type="color" id="k-fill" value="#ffc933"> Fill</label>
+          <label><input type="color" id="k-line" value="#0a4349"> Outline</label>
+          <button type="button" id="k-reset" class="linkish">Reset</button>
+        </div>
         <div class="row" id="list-actions" hidden>
           <span id="count"></span>
           <button type="button" id="clear" class="quiet">Clear list</button>
@@ -178,10 +191,8 @@
               <span><strong>Mapping software or code</strong><small>GeoJSON works in QGIS, ArcGIS and web maps.</small></span></label>
           </fieldset>
           <details id="look" class="tucked">
-            <summary>Colors, labels and file size</summary>
+            <summary>Labels, line width and file size</summary>
             <div class="swatches">
-              <label>Outline <input type="color" id="k-line" value="#0a4349"></label>
-              <label>Fill <input type="color" id="k-fill" value="#ffc933"></label>
               <label class="inline">Width
                 <select id="k-width"><option>1</option><option selected>2</option><option>3</option><option>5</option></select>
               </label>
@@ -195,7 +206,7 @@
               <select id="x-detail"></select>
               <small>Less detail makes a smaller file. Corners get slightly rounded off; nothing is removed.</small>
             </label>
-            <small>Colors and labels are saved in Google Earth files (KML and KMZ).</small>
+            <small>Colors (set under Check your list) and labels are saved in Google Earth files (KML and KMZ).</small>
           </details>
           <p id="size-note" class="lead"></p>
           <p id="size-warn" class="warn" hidden></p>
@@ -220,7 +231,7 @@
         <button type="button" id="mode-list" aria-pressed="false" title="Click shapes you added to inspect, remove or keep them">My list <span id="mode-count"></span></button>
         <button type="button" id="mode-route" aria-pressed="false" title="Click the map to drop route stops">Route</button>
       </div>
-      <button id="panel-toggle" class="sheet-toggle" aria-controls="panel" aria-expanded="true">Hide panel</button>
+      <button id="panel-toggle" class="sheet-toggle" aria-controls="panel" aria-expanded="true">Map</button>
     </main>
   </div>
 
