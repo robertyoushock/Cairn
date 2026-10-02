@@ -787,10 +787,10 @@ function renderStops() {
   ol.hidden = routeStops.length === 0;
   routeStops.forEach((s, i) => {
     s.marker.getElement().textContent = String(i + 1);
-    const up = el('button', { type: 'button', textContent: 'Up', disabled: i === 0 });
+    const up = el('button', { type: 'button', className: 'act', textContent: 'Up', disabled: i === 0 });
     up.setAttribute('aria-label', `Move stop ${i + 1} earlier`);
     up.addEventListener('click', () => { [routeStops[i - 1], routeStops[i]] = [routeStops[i], routeStops[i - 1]]; renderStops(); scheduleRoute(); });
-    const rm = el('button', { type: 'button', textContent: 'Remove' });
+    const rm = el('button', { type: 'button', className: 'act remove', textContent: 'Remove' });
     rm.setAttribute('aria-label', `Remove stop ${i + 1}`);
     rm.addEventListener('click', () => { s.marker.remove(); routeStops.splice(i, 1); renderStops(); scheduleRoute(); });
     ol.append(el('li', {}, el('span', { className: 'num', textContent: String(i + 1) }), el('span', { className: 'lbl', textContent: stopLabel(s, i), title: stopLabel(s, i) }), up, rm));

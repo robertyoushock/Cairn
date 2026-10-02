@@ -199,7 +199,7 @@ export function geojsonToGpx(fc, docName = 'Export') {
   });
   return clean(
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
-      `<gpx version="1.1" creator="maps.robertyoushock.com" xmlns="http://www.topografix.com/GPX/1/1">` +
+      `<gpx version="1.1" creator="Cairn, robertyoushock.com/cairn" xmlns="http://www.topografix.com/GPX/1/1">` +
       `<metadata><name>${esc(docName)}</name></metadata>\n${wpts}\n${trks}\n</gpx>\n`
   );
 }
