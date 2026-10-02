@@ -1,55 +1,145 @@
+<p align="center">
+  <img src="docs/images/hero.jpg" alt="Cairn: a search panel on the left and a map of all 178 Colorado school districts on the right" width="100%">
+</p>
+
 # Cairn
 
-Free, no-backend web tool for finding US boundaries and ArcGIS layers, previewing them on a map, and downloading them as **KML, KMZ, GPX or GeoJSON**.
+**Find the map boundary you need in plain words. Check it. Download it.**
 
-Live at https://robertyoushock.com/cairn/
+Cairn is a free web tool for getting US map data out of the places it hides and into the tools people actually use. Type "texas state house" or "flood zones", see it on the map, and download a file that opens in Google Earth, a GPS watch or GIS software. It's built for people who have never opened ArcGIS, and it's quick enough for people who use it every day.
 
-## What it does
+There's no account, no ads and no tracking. Nothing is stored anywhere: your list lives in your browser tab and goes away when you close it.
 
-Built for people who have never used GIS software.
+`Vanilla JS` · `No build step` · `No server` · `MapLibre` · `KML · KMZ · GPX · GeoJSON` · `$0 a month`
 
-- **One search box.** Type what you want in plain words: "texas state house", "boulder city limits colorado", "wildfires", "flood zones", "fire stations". Results come in two groups: **Verified** (Census boundaries and a hand-checked catalog) and **More from ArcGIS Online**, where every result was opened and checked first. Empty layers, tables and duplicates are dropped. Results near the spot you last clicked come first.
-- **Click the map** to see every ZIP code, city, school district, legislative district and county at that spot. **Right-click** for a quick menu of every area there, from census tract up to the whole state.
-- **Preview before adding.** A sample is drawn on the map and you see how shapes will be named. A menu fixes layers that label by the wrong field. Every result links to its source.
-- **One running list.** Click shapes on the map to inspect, remove or keep only one. Filter the list by name or state.
-- **Routes.** Click the map or type addresses to build a route for driving, biking, walking, or flying plus driving. Or paste a Google Maps directions link.
-- **Download for where you will use it:** Google Earth or Google Maps (KML, KMZ), GPS watches and hiking apps (GPX), or mapping software (GeoJSON). Choose colors and labels, and shrink big files with a detail setting that warns you about Google My Maps limits.
+**[Open Cairn →](https://robertyoushock.com/cairn/)**
 
-Everything runs in the browser. No accounts, no ads, no tracking, and nothing that can run up a bill. See `docs/HANDOFF.md` for how it is built and the rules that keep it free.
+---
 
-## Verified sources
+## Search like a person
 
-US Census Bureau (ZIP areas, state house and senate, congressional, counties, cities and towns, school districts, tracts), NIFC wildfires, USGS earthquakes, National Park Service boundaries, national forests and trails, FEMA flood zones, NWS weather alerts, DeFlock license plate reader cameras. Full credits: `credits.html`.
+<img src="docs/images/search.jpg" alt="Searching 'fire stations' from a spot in Denver: results from Littleton, Sheridan and Boulder come first, each with a count, distance, last update and a Source link">
 
-## Status (checkpoint, 2 October 2026)
+Public map data is easy to find and hard to trust. A normal search returns ten results with the same name: some are empty, some are tables with no shapes, and some label every shape with an ID number. Cairn does the checking for you.
 
-Live and checked in a real browser: every item under "What it does", including routes from a Google Maps link, fly + drive, flood zones, weather alerts, parks, DeFlock cameras through the helper, list filter, styled KML export and size warnings.
+- **Verified first.** Census boundaries are understood from plain words ("boulder city limits colorado", "census tracts ohio"). A hand-checked catalog covers wildfires, earthquakes, flood zones, weather alerts, national parks and forests, trails, and license plate reader cameras.
+- **Everything else is opened before you see it.** Each ArcGIS Online result is fetched and inspected. Empty layers, tables and duplicates are dropped. What's left says how many shapes it has, how fresh it is and who published it.
+- **Nearest first.** Results are ranked by distance from the last spot you clicked, then by last update, then by size. Search "fire stations" from Denver and you get Denver's.
+- **Names that make sense.** Many layers label shapes by the wrong field. One fire layer's default is the incident commander, which is blank. Cairn picks a real name field, shows you three sample names before you add anything, and lets you change it.
+- **Always a way back to the source.** Every result links to the publisher's own page.
 
-Not checked in a real browser: short Google Maps links (maps.app.goo.gl) through the helper, the OpenRouteService backup (no key added yet), national forest trails, and anything on a phone.
+## Or just point
 
-## Roadmap
+<img src="docs/images/pick.jpg" alt="Right-clicking a spot in Denver opens a menu listing the census tract, ZIP code, city, school district, legislative districts, county and state at that point">
 
-Agreed, waiting: a polished README with screenshots (after the UI settles), merge shapes and draw-to-select.
-Offered, not yet approved: automated checks on GitHub (free), shareable links, save and reload a list.
+- **Click the map** to list every ZIP code, city, school district, legislative district and county at that spot.
+- **Right-click** for a quick menu of the same, from census tract up to the whole state, each with a small outline of its shape. Click a row and it's in your list.
+- **Click what you've added** to inspect it, remove it, or keep only that one.
+- **Fill and outline colors** sit right next to the list, and the map follows them.
 
-## Run locally
+## Routes, including the flying part
+
+<img src="docs/images/route.jpg" alt="A fly-plus-drive route from Denver to Provincetown: a drive to Denver's airport, a dashed flight arc to Boston, and a drive out the Cape">
+
+- **Drive, bike or walk** between stops you click or type.
+- **Fly + drive** finds the major airport near each end, draws the drive to it, the flight as a great-circle arc, and the drive out the other side.
+- **Paste a Google Maps directions link** and get the same trip back as a GPX track for a watch or bike computer.
+- Directions come from open routing servers. There's no key and no quota to pay for.
+
+## Big data, small files
+
+<img src="docs/images/fires.jpg" alt="This year's 7,596 wildfire perimeters filtered down to the 137 that mention Colorado, in custom orange, with the file size shown before download">
+
+- **Filter the list** by a name or a state, then keep or remove the matches. "Colorado" also finds rows that only say CO.
+- **Know the size before you download.** Cairn estimates the file and warns you at the limits that bite: Google My Maps stops at 5 MB and 2,000 items.
+- **Four detail levels** round off corners without dropping anything. Colorado's 178 school districts go from 5.2 MB to 0.5 MB.
+- **Download for where you'll use it:** Google Earth or Google Maps (KML, KMZ), GPS watches and hiking apps (GPX), mapping software (GeoJSON). Colors, name labels and attributes carry into Google Earth.
+
+## Works on a phone too
+
+<table>
+<tr>
+<td width="34%"><img src="docs/images/phone.png" alt="Cairn on a phone: the map on top with a cairn-shaped pin, and the boundaries at that spot in a sheet below" width="100%"></td>
+<td>
+
+Cairn is designed for a desk, where the map has room. On a phone the menu becomes a sheet under the map, and one button switches between the two. It's enough to look something up and send yourself the file.
+
+**The pin is a cairn.** So is the logo: five stacked stones, the trail marker hikers leave to say "this way". It seemed right for a tool whose job is pointing at the correct boundary.
+
+</td>
+</tr>
+</table>
+
+---
+
+## How it's built
+
+<img src="docs/images/architecture.png" alt="Architecture: the page in your browser talks directly to the Census Bureau, federal agencies, ArcGIS Online, OpenFreeMap, open routing servers and geocoders; an optional Cloudflare Worker handles two sources that block browsers">
+
+- **About 3,500 lines of plain HTML, CSS and JavaScript.** There's no framework and no bundler; the files in this repo are what runs.
+- **No server.** Each visitor's browser talks straight to the data publishers, so more visitors don't cost anything.
+- **Vetting happens live.** Search hits are probed in parallel and results appear as they pass.
+- **Census layers are found by name,** because their ID numbers change with every release.
+- **Pure functions, tested.** Conversion, simplification, search ranking, link parsing and the helper are covered by 8 test files that run with no network: `npm test`.
+- **Checks that run themselves.** GitHub runs the tests on every push. Once a week it opens every verified source and files an issue here if one has moved, emptied out or lost its name field.
+
+### Staying free
+
+Cairn is public, so nothing in it is allowed to run up a bill.
+
+| Piece | Service | Key needed | Under heavy use |
+| --- | --- | --- | --- |
+| Hosting | GitHub Pages | none | a few hundred KB a visit |
+| Boundaries | US Census TIGERweb | none | public service |
+| Search | ArcGIS Online and each publisher | none | per-publisher limits |
+| Base map | MapLibre + OpenFreeMap | none | donation funded |
+| Directions | FOSSGIS OSRM servers | none | fair use |
+| Place search | Esri, OpenStreetMap Nominatim | none | throttles |
+| Helper | Cloudflare Workers, free plan | none | stops at 100,000 requests a day; never bills |
+
+The rules that keep it that way are at the top of [`docs/HANDOFF.md`](docs/HANDOFF.md).
+
+## Design notes
+
+- **Type:** [Schibsted Grotesk](https://fonts.google.com/specimen/Schibsted+Grotesk), heavy for the wordmark and headings, regular for reading.
+- **Color:** a field-notebook palette.
+
+  | Token | Hex | Used for |
+  | --- | --- | --- |
+  | Tape | `#FFC933` | what's selected, what's yours |
+  | Deep teal | `#0A4349` | outlines, primary buttons |
+  | Ink | `#10222B` | text |
+  | Paper / Fog | `#F8F9F7` / `#E6ECEE` | panel and page |
+
+- **Base map:** a quiet custom style so your shapes are the loudest thing on screen.
+- **Words:** no GIS vocabulary where a plain word works. "Shapes", not "features". "Name each shape by", not "label field".
+- **Honest failures:** when something can't be done, Cairn says so and says why, instead of loading an empty layer.
+
+## Built in versions
+
+| | Added |
+| --- | --- |
+| v1 | Census boundaries, click the map to identify, ArcGIS search, KML / KMZ / GPX / GeoJSON export |
+| v2 | Guided search: verified catalog, plain-language boundaries, vetted results, preview with a name picker |
+| v3 | Map click modes, distance ranking, source links |
+| v4 | Routes, Google Maps links, list filter, colors and labels, detail levels, more verified sources, the helper |
+| v5 | Right-click pick menu, the cairn icon, phone layout, automated checks, this page |
+
+## Run it yourself
 
 ```sh
-npm test      # all checks, no network needed
-npm start     # serves the folder with `serve`
+npm test      # every check, no network needed
+npm start     # serves the folder; ES modules need a server
 ```
 
-ES modules need a server, so opening `index.html` from disk will not work.
+Deploy is GitHub Pages from `main`. The optional helper is one file in [`worker/`](worker/). Adding a verified source is one entry in [`data/catalog.json`](data/catalog.json); the how-to is in the handoff document.
 
-## Deploy
+**Not yet checked in a real browser:** short Google Maps links (maps.app.goo.gl) and the OpenRouteService backup, which needs a key that hasn't been added.
 
-GitHub Pages, branch `main`, folder `/`. The page path follows the repo name and is case sensitive. The optional helper lives in `worker/` (see `worker/README.md`).
+## Credits
 
-## Data notes
+Designed and built by **[Robert Youshock](https://github.com/robertyoushock)** in Denver, with Claude (Anthropic) as a coding partner. Say hi on [LinkedIn](https://www.linkedin.com/in/robert-youshock-1ba979108/).
 
-- Census layer IDs change every vintage, so the app looks layers up by name at run time. If the Census renames a layer, update the regexes in `js/sources.js`.
-- ZIP codes here are **ZCTAs**, Census approximations of USPS ZIP areas. They are not official USPS delivery boundaries, and some ZIPs (PO boxes, single buildings) have no ZCTA.
-- ArcGIS servers must allow cross-origin requests (CORS) for this to read them. ArcGIS Online and most public servers do; some county servers do not, and the app says so when a request is blocked. Those need the planned Worker proxy.
-- The base map is a custom style (`js/basemap.js`) on free OpenMapTiles vector tiles from [OpenFreeMap](https://openfreemap.org), with no API key. The look follows a Maputnik design; the data and fonts (Noto Sans) are free equivalents. Attribution to OpenFreeMap, OpenMapTiles and OpenStreetMap is shown on the map. If traffic grows, consider donating to OpenFreeMap or self-hosting tiles.
-- Never commit API keys or tokens. `test/basemap.test.mjs` fails if the style contains any.
-- Respect each data publisher's license. The app shows the layer's copyright text when the server provides it.
+Boundaries from the US Census Bureau. Verified sources from NIFC, USGS, the National Park Service, the USDA Forest Service, FEMA, the National Weather Service and DeFlock. Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, tiles by [OpenFreeMap](https://openfreemap.org), rendering by [MapLibre GL JS](https://maplibre.org). Airport locations from OurAirports. Full list: [credits](https://robertyoushock.com/cairn/credits.html).
+
+Cairn's code is open source under the [MIT License](LICENSE). The data it helps you download belongs to its publishers and keeps their terms.

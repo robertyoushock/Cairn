@@ -154,12 +154,25 @@ Check `README.md` "Status" for what was and was not verified in a real browser.
 
 ### Agreed but not done
 
-- **A polished, flashy README**, on the level of Robert's "Our Places" project. He asked for this but said to
-  wait for the final version and UI, because more changes are coming. Do not spend effort on it until he says so.
-- **Merge shapes and draw-to-select.** Approved, but "hold off".
-- **Automated checks on GitHub** (run `npm test` on push; weekly job that opens every catalog URL and files an
-  issue when one dies). Free for public repos and needs no AI. Robert asked about cost but has not said yes.
-- **Mobile.** "Nice to have, nothing huge." The panel collapses on small screens; it was never tested on a phone.
+- **Merge shapes and draw-to-select.** Approved, then set aside ("don't worry about merging shapes").
+- **Mobile beyond the basics.** Robert asked only that phones look decent for the showcase. The menu is a sheet
+  under the map with one Map / Menu button. It was checked in a phone-sized browser window, never on a real phone.
+
+### How the README images were made
+
+`docs/images/` holds composed showcase images in the style of Robert's "Our Places" project page. The screenshots
+are real captures of the live site at a 1600 x 1000 desktop layout (taken as four tiles and stitched). They were
+then placed in a browser frame with callouts using a throwaway HTML page rendered with Playwright, in the brand
+font (Schibsted Grotesk) and colors. `img/social.png` (the link preview) was made the same way. If the UI changes
+a lot, retake them; the README says what each one shows.
+
+### Automated checks
+
+- `.github/workflows/test.yml` runs `npm test` on every push.
+- `.github/workflows/catalog-check.yml` runs `scripts/check-catalog.mjs` every Monday and on demand. It opens
+  every catalog source and every Census layer. When something is broken it opens (or comments on) an issue titled
+  "Catalog check: sources need attention", which emails Robert. DeFlock puts a robot check in front of GitHub's
+  servers, so that one source is reported as "could not check" rather than broken.
 
 ### Ideas not yet discussed further
 
