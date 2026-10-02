@@ -47,7 +47,13 @@ export async function checkGeojson(entry) {
   // Sources that block browsers are checked the way visitors reach them: through Cairn's helper.
   const url = entry.needsRelay && RELAY_URL ? `${RELAY_URL.replace(/\/+$/, '')}/?url=${encodeURIComponent(entry.url)}` : entry.url;
   const res = await fetch(url, { signal: AbortSignal.timeout(120000), headers: { 'User-Agent': 'cairn-catalog-check (github.com/robertyoushock/cairn)' } });
-  if (!res.ok) return `answered ${res.status} (asked ${new URL(url).host}; reply began: ${(await res.text().catch(() => '')).slice(0, 120).replace(/\s+/g, ' ')})`;
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    // Some publishers put a robot check in front of data-center traffic (which is what GitHub's servers are).
+    // Visitors at home are not affected, so this is reported as "could not check", not as broken.
+    if (res.status === 403 && /Just a moment|challenge/i.test(body)) return { skipped: 'the publisher blocks automated checks from GitHub; open Cairn and search for it to check by hand' };
+    return `answered ${res.status} (asked ${new URL(url).host}; reply began: ${body.slice(0, 120).replace(/\s+/g, ' ')})`;
+  }
   let buf = Buffer.from(await res.arrayBuffer());
   if (buf[0] === 0x1f && buf[1] === 0x8b) buf = gunzipSync(buf);
   const json = JSON.parse(buf.toString('utf8'));
@@ -70,7 +76,8 @@ async function main() {
     let problem;
     try { problem = entry.type === 'arcgis' ? await checkArcgis(entry) : await checkGeojson(entry); }
     catch (e) { problem = `could not be reached (${e.message})`; }
-    rows.push({ name: entry.title, where: `data/catalog.json, id \`${entry.id}\``, url: entry.url, problem });
+    const skipped = problem && typeof problem === 'object' ? problem.skipped : null;
+    rows.push({ name: entry.title, where: `data/catalog.json, id \`${entry.id}\``, url: entry.url, problem: skipped ? null : problem, skipped });
   }
   for (const [type, t] of Object.entries(BOUNDARY_TYPES)) {
     let problem;
@@ -80,11 +87,15 @@ async function main() {
   }
   const bad = rows.filter((r) => r.problem);
   const out = [];
-  out.push(bad.length ? `## ${bad.length} of ${rows.length} sources need attention` : `## All ${rows.length} sources are healthy`, '');
+  const skips = rows.filter((r) => r.skipped);
+  const checked = rows.length - skips.length;
+  out.push(bad.length ? `## ${bad.length} of ${checked} sources need attention` : `## All ${checked} checked sources are healthy`, '');
   out.push(`Checked ${new Date().toISOString().slice(0, 10)}.`, '');
   for (const r of bad) out.push(`- **${r.name}** ${r.problem}.`, `  - Where to fix: ${r.where}`, `  - Link: ${r.url}`);
   if (bad.length) out.push('', 'How to fix: open the link, find where the publisher moved the layer or renamed the field, and update the entry. See "Adding a catalog entry" in docs/HANDOFF.md. A server that was only down for the day needs no change; this issue can be closed.', '');
-  out.push('<details><summary>Everything that was checked</summary>', '', ...rows.map((r) => `- ${r.problem ? 'BROKEN' : 'ok'}: ${r.name}`), '', '</details>');
+  for (const r of skips) out.push(`- Could not check **${r.name}**: ${r.skipped}.`);
+  if (skips.length) out.push('');
+  out.push('<details><summary>Everything that was checked</summary>', '', ...rows.map((r) => `- ${r.problem ? 'BROKEN' : r.skipped ? 'not checked' : 'ok'}: ${r.name}`), '', '</details>');
   console.log(out.join('\n'));
   process.exit(bad.length ? 1 : 0);
 }
