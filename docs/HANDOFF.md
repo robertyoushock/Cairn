@@ -145,8 +145,8 @@ Everything works without the Worker except DeFlock cameras and short Google Maps
 ## State of things on 2 October 2026
 
 Built and tested: boundaries (ZIP, state house, state senate, congressional, county, city, school district,
-tract), click-to-identify, place search, guided search with vetting and distance ranking, preview with label
-picker, source links, map click modes (What's here? / My list / Route), list filter, KML colors, labels and
+tract, state), click-to-identify, place search, guided search with vetting and distance ranking, preview with label
+picker, source links, map click modes (What's here? / My list / Route), right-click "Pick an area" menu (tract up to state, rough shapes for speed, full shape fetched on pick), list filter, KML colors, labels and
 attributes, shape detail levels with size warnings, route builder, Google Maps link reader, report-a-problem
 link, credits page.
 

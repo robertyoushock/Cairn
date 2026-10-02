@@ -9,7 +9,7 @@ Live at https://robertyoushock.com/cairn/
 Built for people who have never used GIS software.
 
 - **One search box.** Type what you want in plain words: "texas state house", "boulder city limits colorado", "wildfires", "flood zones", "fire stations". Results come in two groups: **Verified** (Census boundaries and a hand-checked catalog) and **More from ArcGIS Online**, where every result was opened and checked first. Empty layers, tables and duplicates are dropped. Results near the spot you last clicked come first.
-- **Click the map** to see every ZIP code, city, school district, legislative district and county at that spot.
+- **Click the map** to see every ZIP code, city, school district, legislative district and county at that spot. **Right-click** for a quick menu of every area there, from census tract up to the whole state.
 - **Preview before adding.** A sample is drawn on the map and you see how shapes will be named. A menu fixes layers that label by the wrong field. Every result links to its source.
 - **One running list.** Click shapes on the map to inspect, remove or keep only one. Filter the list by name or state.
 - **Routes.** Click the map or type addresses to build a route for driving, biking, walking, or flying plus driving. Or paste a Google Maps directions link.
