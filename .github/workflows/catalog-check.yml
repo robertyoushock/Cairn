@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   issues: write
+  actions: write
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -16,6 +17,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # GitHub switches off scheduled workflows in a repository with no commits for 60 days.
+      # Re-enabling them through the API resets that clock, so the weekly check keeps itself and the
+      # yearly course review alive without anyone touching the repository.
+      - name: Keep the scheduled checks switched on
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for wf in catalog-check.yml course-reminder.yml; do
+            gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/enable" || echo "could not re-enable $wf"
+          done
       - name: Check every source
         id: check
         run: node scripts/check-catalog.mjs > report.md

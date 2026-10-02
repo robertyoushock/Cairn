@@ -227,6 +227,10 @@ Overpass (timed out every time), Strava routes (need a login).
 - `.github/workflows/course-reminder.yml` runs `scripts/course-reminder.mjs` on January 4 each year and on
   demand. It opens an issue titled "Marathon courses: yearly review (YEAR)" with a checkbox per race, oldest
   course first, each linking to the organizer. Nothing else can tell a stale course from a current one.
+- GitHub switches off scheduled workflows in a repository that has had no commits for 60 days, and emails first.
+  The weekly check re-enables itself and the yearly review through the API on every run, which resets that
+  clock. If an email saying "scheduled workflow disabled" ever arrives anyway, open the Actions tab and press
+  "Enable workflow" on both.
 
 ### Ideas not yet discussed further
 

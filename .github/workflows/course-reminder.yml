@@ -20,4 +20,5 @@ jobs:
       - name: Open the review issue
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue create --title "Marathon courses: yearly review ($(date +%Y))" --body-file reminder.md
+        run: |
+          gh issue create --title "Marathon courses: yearly review ($(date +%Y))" --body-file reminder.md
