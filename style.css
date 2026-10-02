@@ -262,6 +262,8 @@ input[type='range'] { width: 100%; }
 .colors { display: flex; align-items: center; gap: 16px; margin-top: 10px; padding: 8px 10px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); }
 .colors label { flex-direction: row; align-items: center; gap: 8px; cursor: pointer; }
 .colors input[type='color'] { width: 34px; height: 28px; padding: 0; border: 1px solid var(--ink-soft); border-radius: 6px; background: none; cursor: pointer; }
+.colors { flex-wrap: wrap; row-gap: 8px; }
+.colors label.w select { padding: 4px 6px; font-size: 14px; }
 .colors .linkish { margin-left: auto; font-size: 13px; }
 .cairn-pin { filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); pointer-events: none; }
 
@@ -287,3 +289,8 @@ input[type='range'] { width: 100%; }
   .cards { grid-template-columns: 1fr 1fr; }
   .pick { min-width: min(280px, 80vw); }
 }
+
+/* ---- Keyboard focus is always visible on map popups ---- */
+.pick-list button:focus-visible, .hits button:focus-visible, .modebar button:focus-visible, .maplibregl-popup-close-button:focus-visible, .src:focus-visible { outline: 3px solid var(--ink); outline-offset: -3px; }
+.maplibregl-canvas:focus-visible { outline: 3px solid var(--tape); outline-offset: -3px; }
+.stop-pin:focus-visible { outline: 3px solid var(--tape); outline-offset: 2px; }

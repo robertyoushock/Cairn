@@ -168,6 +168,9 @@
         <div class="colors" id="list-colors" hidden>
           <label><input type="color" id="k-fill" value="#ffc933"> Fill</label>
           <label><input type="color" id="k-line" value="#0a4349"> Outline</label>
+          <label class="w">Width
+            <select id="k-width" aria-label="Outline width"><option value="1">Thin</option><option value="2" selected>Normal</option><option value="3">Thick</option><option value="5">Heavy</option><option value="8">Extra heavy</option></select>
+          </label>
           <button type="button" id="k-reset" class="linkish">Reset</button>
         </div>
         <div class="row" id="list-actions" hidden>
@@ -191,12 +194,7 @@
               <span><strong>Mapping software or code</strong><small>GeoJSON works in QGIS, ArcGIS and web maps.</small></span></label>
           </fieldset>
           <details id="look" class="tucked">
-            <summary>Labels, line width and file size</summary>
-            <div class="swatches">
-              <label class="inline">Width
-                <select id="k-width"><option>1</option><option selected>2</option><option>3</option><option>5</option></select>
-              </label>
-            </div>
+            <summary>Labels, fill strength and file size</summary>
             <label>Fill strength
               <input type="range" id="k-opacity" min="0" max="100" value="30">
             </label>
@@ -206,7 +204,7 @@
               <select id="x-detail"></select>
               <small>Less detail makes a smaller file. Corners get slightly rounded off; nothing is removed.</small>
             </label>
-            <small>Colors (set under Check your list) and labels are saved in Google Earth files (KML and KMZ).</small>
+            <small>Colors and outline width (set under Check your list) and labels are saved in Google Earth files (KML and KMZ).</small>
           </details>
           <p id="size-note" class="lead"></p>
           <p id="size-warn" class="warn" hidden></p>
@@ -225,7 +223,7 @@
     </aside>
 
     <main class="stage">
-      <div id="map" aria-label="Map"></div>
+      <div id="map"></div>
       <div class="modebar" role="group" aria-label="What a map click does">
         <button type="button" id="mode-spot" aria-pressed="true" title="Click the map to see every boundary at that spot">What&rsquo;s here?</button>
         <button type="button" id="mode-list" aria-pressed="false" title="Click shapes you added to inspect, remove or keep them">My list <span id="mode-count"></span></button>

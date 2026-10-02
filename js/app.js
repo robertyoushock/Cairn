@@ -52,6 +52,7 @@ const map = new maplibregl.Map({
   maxPitch: 0,
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+map.getCanvas().setAttribute('aria-label', 'Map. Arrow keys move it, plus and minus zoom. Press Enter to list the areas at the center.');
 map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-left');
 
 const EMPTY = { type: 'FeatureCollection', features: [] };
@@ -300,6 +301,21 @@ $('route').addEventListener('toggle', () => {
   else if (!$('route').open && mode === 'route') setMode(selection.size ? 'list' : 'spot');
 });
 
+// ---------- Popups that work without a mouse ----------
+// Every map popup is announced as a small dialog, takes focus when it opens, closes on Escape,
+// and hands focus back to the map so keyboard users are never stranded.
+function accessiblePopup(p, wrap, label, { focusFirst = true } = {}) {
+  wrap.setAttribute('role', 'dialog');
+  wrap.setAttribute('aria-label', label);
+  wrap.tabIndex = -1;
+  wrap.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.stopPropagation(); p.remove(); }
+  });
+  p.on('close', () => { if (wrap.contains(document.activeElement) || document.activeElement === document.body) map.getCanvas().focus({ preventScroll: true }); });
+  if (focusFirst) requestAnimationFrame(() => (wrap.querySelector('button:not([disabled])') || wrap).focus({ preventScroll: true }));
+}
+const focusPopup = (wrap) => (wrap.querySelector('button:not([disabled])') || wrap).focus({ preventScroll: true });
+
 function hitCard(f, close) {
   const full = selection.get(f.properties._key) || f;
   const box = el('div', { className: 'hit' }, el('div', { className: 'hn', textContent: featureName(full) }), el('div', { className: 'hk', textContent: kindOf(full) }));
@@ -313,8 +329,12 @@ function hitCard(f, close) {
     renderSelection(); close(); fit(bboxOf({ features: [full] })); status(`Kept only ${featureName(full)}.`);
   });
   const more = el('button', { type: 'button', textContent: 'Details' });
+  more.setAttribute('aria-expanded', 'false');
+  rm.setAttribute('aria-label', `Remove ${featureName(full)} from your list`);
+  only.setAttribute('aria-label', `Keep only ${featureName(full)} and remove everything else`);
   let dl = null;
   more.addEventListener('click', () => {
+    more.setAttribute('aria-expanded', String(!dl));
     if (dl) { dl.remove(); dl = null; return; }
     dl = el('dl');
     Object.entries(full.properties).filter(([k, v]) => !k.startsWith('_') && v != null && String(v).trim() !== '').slice(0, 14)
@@ -342,6 +362,7 @@ function inspectList(point, lngLat) {
   hits.forEach((h) => wrap.append(hitCard(h, close)));
   popup = new maplibregl.Popup({ maxWidth: '300px' }).setLngLat(lngLat).setDOMContent(wrap).addTo(map);
   popup.on('close', () => { popup = null; setPreview(null); });
+  accessiblePopup(popup, wrap, hits.length > 1 ? `${hits.length} shapes from your list at this spot` : `${featureName(selection.get(hits[0].properties._key))}, from your list`);
   status(hits.length > 1 ? `${hits.length} shapes overlap here. Pick the one you want.` : 'Inspect it, or remove it from your list.');
 }
 
@@ -398,13 +419,17 @@ async function pickMenu(lngLat) {
   const head = el('div', { className: 'pick-head', textContent: 'Pick an area' });
   const list = el('ul', { className: 'pick-list' }, el('li', { className: 'pick-note', textContent: 'Looking up this spot…' }));
   const wrap = el('div', { className: 'pick' }, head, list);
+  list.setAttribute('aria-busy', 'true');
   const mine = new maplibregl.Popup({ maxWidth: '380px', className: 'pick-pop' }).setLngLat(lngLat).setDOMContent(wrap).addTo(map);
   popup = mine;
+  accessiblePopup(mine, wrap, 'Pick an area at this spot');
+  status('Looking up the areas at this spot…', 'busy');
   mine.on('close', () => { if (popup === mine) popup = null; setPreview(null); });
   // Rough shapes come back in a fraction of the time; the full shape is fetched when one is picked.
   const { features, failed } = await identifyAt(lngLat.lng, lngLat.lat, { types: PICK_ORDER, generalize: 0.002 }).catch(() => ({ features: [], failed: PICK_ORDER.length }));
   if (token !== pickToken || popup !== mine) return;
   list.replaceChildren();
+  list.removeAttribute('aria-busy');
   if (!features.length) {
     list.append(el('li', { className: 'pick-note', textContent: failed ? 'The Census server did not answer. Right-click again in a moment.' : 'No US areas here. Try a spot inside the United States.' }));
     return;
@@ -412,11 +437,15 @@ async function pickMenu(lngLat) {
   features.forEach((f) => {
     const have = () => selection.has(f.properties._key);
     const b = el('button', { type: 'button' }, shapeIcon(f.geometry), el('span', { className: 'pn', textContent: featureName(f) }), el('span', { className: 'pk', textContent: have() ? 'Added' : KIND[f.properties._type] }));
+    const say = () => b.setAttribute('aria-label', `${featureName(f)}, ${KIND[f.properties._type]}${have() ? ', already in your list' : '. Add to your list'}`);
+    say();
     b.addEventListener('mouseenter', () => setPreview(f));
     b.addEventListener('mouseleave', () => setPreview(null));
+    b.addEventListener('focus', () => setPreview(f));
+    b.addEventListener('blur', () => setPreview(null));
     b.addEventListener('click', async () => {
-      if (have() || b.disabled) return;
-      b.disabled = true;
+      if (have() || b.dataset.busy) return;
+      b.dataset.busy = '1';
       b.querySelector('.pk').textContent = 'Adding…';
       try {
         const full = await fullFeature(f);
@@ -424,22 +453,35 @@ async function pickMenu(lngLat) {
         refreshHere();
         b.querySelector('.pk').textContent = 'Added';
         b.classList.add('done');
-        status(`Added ${featureName(full)}. Pick more, or close the menu.`);
+        b.setAttribute('aria-disabled', 'true');
+        say();
+        status(`Added ${featureName(full)}. Pick more, or press Escape to close the menu.`);
       } catch (e) {
-        b.disabled = false;
         b.querySelector('.pk').textContent = KIND[f.properties._type];
         status(e.message, 'error');
+      } finally {
+        delete b.dataset.busy;
       }
     });
-    if (have()) { b.disabled = true; b.classList.add('done'); }
+    if (have()) { b.setAttribute('aria-disabled', 'true'); b.classList.add('done'); }
     list.append(el('li', {}, b));
   });
   if (failed) list.append(el('li', { className: 'pick-note', textContent: 'Some areas could not be loaded. Right-click again to retry.' }));
+  status(`${features.length} areas at this spot. Pick the ones you want.`);
+  focusPopup(wrap);
 }
 map.on('contextmenu', (e) => {
   e.preventDefault();
   pickMenu(e.lngLat);
 });
+// Without a mouse: focus the map, move it with the arrow keys, then Enter lists the areas at the center.
+map.getCanvas().addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+    e.preventDefault();
+    pickMenu(map.getCenter());
+  }
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && popup) popup.remove(); });
 
 // ---------- Search a place / my location ----------
 $('place-form').addEventListener('submit', (e) => {
@@ -883,6 +925,7 @@ function renderStops() {
   ol.hidden = routeStops.length === 0;
   routeStops.forEach((s, i) => {
     s.marker.getElement().textContent = String(i + 1);
+    s.marker.getElement().setAttribute('aria-label', `Stop ${i + 1}: ${stopLabel(s, i)}. Drag to move it.`);
     const up = el('button', { type: 'button', className: 'act', textContent: 'Up', disabled: i === 0 });
     up.setAttribute('aria-label', `Move stop ${i + 1} earlier`);
     up.addEventListener('click', () => { [routeStops[i - 1], routeStops[i]] = [routeStops[i], routeStops[i - 1]]; renderStops(); scheduleRoute(); });
@@ -1070,7 +1113,7 @@ function updateDownload() {
     const saved = full > pts ? ` (${Math.round((1 - pts / full) * 100)}% fewer points than full detail)` : '';
     $('size-note').textContent = `About ${prettyBytes(bytes)} · ${pts.toLocaleString()} points${saved}`;
     const warns = sizeWarnings(bytes, n, fmt);
-    if (warns.length && $('x-detail').value !== 'small') warns.push('Change "Shape detail" under Labels, line width and file size.');
+    if (warns.length && $('x-detail').value !== 'small') warns.push('Change "Shape detail" under Labels, fill strength and file size.');
     $('size-warn').textContent = warns.join(' ');
     $('size-warn').hidden = warns.length === 0;
     if (warns.length) $('look').open = true;
@@ -1094,7 +1137,7 @@ function applyLook() {
   });
 }
 ['k-line', 'k-fill', 'k-opacity', 'k-width'].forEach((id) => $(id).addEventListener('input', applyLook));
-$('k-reset').addEventListener('click', () => { $('k-fill').value = '#ffc933'; $('k-line').value = '#0a4349'; applyLook(); });
+$('k-reset').addEventListener('click', () => { $('k-fill').value = '#ffc933'; $('k-line').value = '#0a4349'; $('k-width').value = '2'; applyLook(); });
 
 function download(blob, filename) {
   const a = el('a', { href: URL.createObjectURL(blob), download: filename });

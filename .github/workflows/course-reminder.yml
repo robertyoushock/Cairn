@@ -1,0 +1,23 @@
+# Every January, opens an issue listing each marathon course and the year it shows, so stale courses get reviewed.
+# Free for public repositories; needs no secrets beyond the built-in token.
+name: Yearly course review
+on:
+  schedule:
+    - cron: '23 15 4 1 *' # January 4, 15:23 UTC
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/course-reminder.mjs > reminder.md
+      - name: Open the review issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "Marathon courses: yearly review ($(date +%Y))" --body-file reminder.md
