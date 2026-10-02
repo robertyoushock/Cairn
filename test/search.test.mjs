@@ -63,6 +63,14 @@ assert.equal(ids('colfax marathon water stations')[0], 'marathon-denver-water');
 assert.equal(ids('la marathon')[0], 'marathon-la-course');
 assert.equal(ids('chicago marathon route')[0], 'marathon-chicago-course');
 assert.equal(ids('marine corps marathon')[0], 'marathon-dc-course');
+assert.equal(ids('nyc marathon')[0], 'marathon-nyc-course');
+assert.equal(ids('new york marathon')[0], 'marathon-nyc-course');
+assert.equal(ids('boston marathon')[0], 'marathon-boston-course');
+assert.equal(ids('miami marathon')[0], 'marathon-miami-course');
+for (const f of ['boston', 'new-york-city', 'miami', 'denver-colfax-2026']) {
+  const c = JSON.parse(fs.readFileSync(new URL(`../data/courses/${f}.geojson`, import.meta.url))).features[0];
+  assert.ok(c.properties.miles > 26 && c.properties.miles < 27.1, `${f} is marathon length (${c.properties.miles} mi)`);
+}
 const allM = searchCatalog(cat.entries, 'marathon', 40).map((e) => e.kind);
 assert.ok(allM.lastIndexOf('course') < allM.findIndex((k) => k !== 'course'), '"marathon" alone lists every course before any station layer');
 assert.deepEqual(ids('marathon county wisconsin'), [], 'Marathon County is a county, not a race');

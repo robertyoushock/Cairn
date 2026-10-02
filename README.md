@@ -23,6 +23,7 @@ There's no account, no ads and no tracking. Nothing is stored anywhere: your lis
 Public map data is easy to find and hard to trust. A normal search returns ten results with the same name: some are empty, some are tables with no shapes, and some label every shape with an ID number. Cairn does the checking for you.
 
 - **Verified first.** Census boundaries are understood from plain words ("boulder city limits colorado", "census tracts ohio"). A hand-checked catalog covers wildfires, earthquakes, flood zones, weather alerts, national parks and forests, trails, and license plate reader cameras.
+- **Marathon courses.** Search "denver marathon" or "nyc marathon" for the course, with water stations, mile markers and medical stations where the organizer publishes them. Eleven races so far: Denver, New York City, Boston, Miami, Los Angeles, Chicago, Marine Corps, Oklahoma City, Twin Cities, St. George and Anchorage.
 - **Everything else is opened before you see it.** Each ArcGIS Online result is fetched and inspected. Empty layers, tables and duplicates are dropped. What's left says how many shapes it has, how fresh it is and who published it.
 - **Nearest first.** Results are ranked by distance from the last spot you clicked, then by last update, then by size. Search "fire stations" from Denver and you get Denver's.
 - **Names that make sense.** Many layers label shapes by the wrong field. One fire layer's default is the incident commander, which is blank. Cairn picks a real name field, shows you three sample names before you add anything, and lets you change it.
@@ -93,7 +94,7 @@ Cairn is public, so nothing in it is allowed to run up a bill.
 | Boundaries | US Census TIGERweb | none | public service |
 | Search | ArcGIS Online and each publisher | none | per-publisher limits |
 | Base map | MapLibre + OpenFreeMap | none | donation funded |
-| Directions | FOSSGIS OSRM servers | none | fair use |
+| Directions | FOSSGIS OSRM, then Valhalla | none | fair use; the second takes over if the first throttles |
 | Place search | Esri, OpenStreetMap Nominatim | none | throttles |
 | Helper | Cloudflare Workers, free plan | none | stops at 100,000 requests a day; never bills |
 
@@ -124,6 +125,7 @@ The rules that keep it that way are at the top of [`docs/HANDOFF.md`](docs/HANDO
 | v3 | Map click modes, distance ranking, source links |
 | v4 | Routes, Google Maps links, list filter, colors and labels, detail levels, more verified sources, the helper |
 | v5 | Right-click pick menu, the cairn icon, phone layout, automated checks, this page |
+| v6 | Marathon courses with water stations and mile markers, a backup routing server |
 
 ## Run it yourself
 

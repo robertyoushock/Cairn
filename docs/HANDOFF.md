@@ -36,7 +36,7 @@ Robert asked for this explicitly. Public traffic must never be able to cost him 
 | Search | ArcGIS Online search + each publisher's server | none | Per-publisher limits |
 | Base map | OpenFreeMap vector tiles | none | Donation funded. If Cairn gets big: donate or self-host tiles |
 | Place search | Esri World Geocoder, then OSM Nominatim | none | Nominatim asks for about 1 request a second; throttles or blocks |
-| Directions | FOSSGIS OSRM (`routing.openstreetmap.de`) | none | Fair-use service, no guarantee; may throttle |
+| Directions | FOSSGIS OSRM (`routing.openstreetmap.de`), then FOSSGIS Valhalla | none | Fair use. OSRM blocked an address for a while after about 80 requests in two minutes (while tracing race courses); Valhalla takes over when that happens |
 | Directions (backup) | OpenRouteService via the Worker | Worker secret | Daily quota, then errors |
 | Blocked datasets | Cloudflare Worker relay | none | 100,000 requests a day, then errors |
 | Libraries, fonts | unpkg, Google Fonts | none | Free CDNs |
@@ -186,6 +186,11 @@ How to add one: get the line as GeoJSON, check its length is 26.2 to 26.8 miles 
 it in `data/courses/`, add catalog entries for the course and any station layers, say the year in `freshness`,
 and credit the source. `scripts/course_tools.py` has the helpers that wrote the existing files. Courses change
 most years; the catalog check cannot tell a stale course from a current one, so review them each season.
+
+Boston, New York City and Miami were traced with the Valhalla router (`costing: auto` with one-ways and access
+rules ignored, since race roads are closed), ten stops per request, one request a second. Boston was checked
+against an independent line and stayed within 80 meters of it. New York and Miami had no reference, only the
+26.2-mile check and known mile points, so treat those as the least certain; Miami runs about 3 percent long.
 
 Sources that did not work: Garmin Connect courses (need a login), NYRR's course page (no data behind it),
 Overpass (timed out every time).

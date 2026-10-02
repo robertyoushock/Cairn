@@ -98,11 +98,53 @@ export async function roadLeg(points, mode, { relay = '' } = {}) {
       // Fall through to the keyless server: quota used up, key missing, or relay down.
     }
   }
-  const path = points.map((p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`).join(';');
-  const j = await fetchJson(`${OSRM}/${OSRM_PROFILE[mode]}/route/v1/driving/${path}?overview=full&geometries=geojson&continue_straight=false`);
-  const r = j.routes?.[0];
-  if (j.code !== 'Ok' || !r) throw new Error(j.code === 'NoRoute' ? 'No route found between these stops. Try moving a stop closer to a road.' : 'The directions service could not build this route.');
-  return { coordinates: r.geometry.coordinates, distance: r.distance, duration: r.duration, provider: 'OSRM (FOSSGIS)' };
+  try {
+    const path = points.map((p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`).join(';');
+    const j = await fetchJson(`${OSRM}/${OSRM_PROFILE[mode]}/route/v1/driving/${path}?overview=full&geometries=geojson&continue_straight=false`);
+    const r = j.routes?.[0];
+    if (j.code !== 'Ok' || !r) throw new Error(j.code === 'NoRoute' ? 'No route found between these stops. Try moving a stop closer to a road.' : 'The directions service could not build this route.');
+    return { coordinates: r.geometry.coordinates, distance: r.distance, duration: r.duration, provider: 'OSRM (FOSSGIS)' };
+  } catch (first) {
+    // The first server throttles busy visitors, so a second free one stands behind it.
+    try { return await valhallaLeg(points, mode); } catch { throw first; }
+  }
+}
+
+// Second keyless router. Takes at most 10 stops per request, so long routes go in overlapping pieces.
+const VALHALLA = 'https://valhalla1.openstreetmap.de/route';
+const VALHALLA_COSTING = { car: 'auto', bike: 'bicycle', walk: 'pedestrian' };
+
+export function decodePolyline6(str) {
+  const out = [];
+  let i = 0, lat = 0, lng = 0;
+  const next = () => {
+    let b, shift = 0, result = 0;
+    do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    return result & 1 ? ~(result >> 1) : result >> 1;
+  };
+  while (i < str.length) { lat += next(); lng += next(); out.push([lng / 1e6, lat / 1e6]); }
+  return out;
+}
+
+async function valhallaLeg(points, mode) {
+  const coordinates = [];
+  let distance = 0;
+  let duration = 0;
+  for (let s = 0; s < points.length - 1; s += 9) {
+    const chunk = points.slice(s, s + 10);
+    const j = await fetchJson(VALHALLA, {
+      method: 'POST',
+      body: JSON.stringify({ locations: chunk.map((p) => ({ lon: p[0], lat: p[1] })), costing: VALHALLA_COSTING[mode], units: 'kilometers' }),
+    });
+    if (!j.trip?.legs?.length) throw new Error('No route found between these stops. Try moving a stop closer to a road.');
+    for (const leg of j.trip.legs) {
+      const seg = decodePolyline6(leg.shape);
+      coordinates.push(...(coordinates.length ? seg.slice(1) : seg));
+    }
+    distance += j.trip.summary.length * 1000;
+    duration += j.trip.summary.time;
+  }
+  return { coordinates, distance, duration, provider: 'Valhalla (FOSSGIS)' };
 }
 
 const lineFeature = (name, coordinates, props) => ({ type: 'Feature', properties: { name, ...props }, geometry: { type: 'LineString', coordinates } });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { parseMapsLink, greatCircle, distanceKm, pickAirport, planFlight, buildRoute, roadLeg, prettyDistance, prettyDuration } from '../js/routes.js';
+import { parseMapsLink, greatCircle, distanceKm, pickAirport, planFlight, buildRoute, roadLeg, prettyDistance, prettyDuration, decodePolyline6 } from '../js/routes.js';
 import { geojsonToGpx } from '../js/convert.js';
 
 const airports = JSON.parse(fs.readFileSync(new URL('../data/airports.json', import.meta.url))).airports;
@@ -70,6 +70,11 @@ globalThis.fetch = async (url, init) => {
     const pts = u.split('/driving/')[1].split('?')[0].split(';').map((s) => s.split(',').map(Number));
     return ok({ code: 'Ok', routes: [{ geometry: { type: 'LineString', coordinates: pts }, distance: 45184, duration: 2500 }] });
   }
+  if (u.includes('valhalla')) {
+    const b = JSON.parse(init.body);
+    // _p~iF~ps|U_ulLnnqC_mqNvxq` is the textbook polyline; at precision 6 it decodes to three points
+    return ok({ trip: { legs: [{ shape: '_p~iF~ps|U_ulLnnqC_mqNvxq`@' }], summary: { length: 12.5, time: 900 }, costing: b.costing } });
+  }
   throw new Error('unexpected ' + u);
 };
 
@@ -79,7 +84,17 @@ assert.match(calls.at(-1), /routed-bike\/route\/v1\/driving\/-104\.990300,39\.73
 leg = await roadLeg([DEN, [-105.27, 40.01]], 'car', { relay: 'https://relay.example/' });
 assert.equal(leg.provider, 'OpenRouteService');
 assert.equal(leg.coordinates[0].length, 2, 'elevation is dropped so files stay small');
-await assert.rejects(() => roadLeg([[0, 0], [1, 1]], 'walk'), /No route found/);
+// when the first router is down or throttling, the second one answers
+const savedFetch = globalThis.fetch;
+globalThis.fetch = async (url, init) => (String(url).includes('routing.openstreetmap.de') ? Promise.reject(new TypeError('Failed to fetch')) : savedFetch(url, init));
+leg = await roadLeg([DEN, [-105.27, 40.01]], 'walk');
+assert.equal(leg.provider, 'Valhalla (FOSSGIS)');
+assert.equal(leg.distance, 12500);
+assert.equal(leg.coordinates.length, 3);
+assert.deepEqual(decodePolyline6('_p~iF~ps|U')[0], [-12.02, 3.85]);
+globalThis.fetch = async (url) => { if (String(url).includes('valhalla')) throw new TypeError('Failed to fetch'); return ok({ code: 'NoRoute' }); };
+await assert.rejects(() => roadLeg([[0, 0], [1, 1]], 'walk'), /No route found/, 'when both fail, the first router\'s plain message is shown');
+globalThis.fetch = savedFetch;
 await assert.rejects(() => roadLeg([DEN], 'car'), /at least two/);
 
 const stops = [{ lng: DEN[0], lat: DEN[1], label: 'Denver' }, { lng: -105.22, lat: 39.75, label: 'Golden' }, { lng: -105.27, lat: 40.01, label: 'Boulder' }];
