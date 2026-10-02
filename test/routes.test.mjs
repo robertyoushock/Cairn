@@ -19,7 +19,8 @@ assert.ok(arc[16][1] > 42 && Math.max(...arc.map((c) => c[1])) > 42.6, 'the arc 
 // ---- airports ----
 assert.equal(pickAirport(DEN, airports).code, 'DEN');
 assert.equal(pickAirport(BOS, airports).code, 'BOS');
-assert.ok(['HYA', 'BOS', 'PVD'].includes(pickAirport(CAPE, airports).code));
+assert.equal(pickAirport(CAPE, airports).code, 'BOS', 'a major airport beats the small local one');
+assert.equal(pickAirport([-110.36, 46.6], airports).big, false, 'rural Montana still gets its regional airport');
 assert.equal(planFlight(DEN, BOS, airports).to.code, 'BOS');
 assert.throws(() => planFlight(DEN, [-105.27, 40.01], airports), /close enough to drive/);
 

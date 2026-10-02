@@ -37,14 +37,15 @@ export function greatCircle(a, b, steps = 64) {
   return out;
 }
 
-// The airport a traveler would realistically use: the closest one, with a nudge toward big airports
-// so a major hub 40 miles away beats a tiny regional strip 30 miles away.
+// The airport a traveler would realistically use: the closest one, with a strong pull toward big airports,
+// so Boston beats the small Cape Cod airport for someone flying in from Denver. A big airport wins unless it
+// is more than about 75 miles farther away than the nearest small one.
 export function pickAirport(point, airports) {
   let best = null;
   let bestScore = Infinity;
   for (const a of airports) {
     const d = distanceKm(point, [a.lng, a.lat]);
-    const score = d + (a.big ? 0 : 60);
+    const score = d + (a.big ? 0 : 120);
     if (score < bestScore) { bestScore = score; best = { ...a, km: d }; }
   }
   return best;
