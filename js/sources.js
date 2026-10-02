@@ -307,7 +307,7 @@ export async function inspectUrl(rawUrl) {
   throw new Error('That URL did not look like an ArcGIS REST service, layer or services folder.');
 }
 
-export async function loadLayer({ url, where = '1=1', bbox = null, limit = 10000, labelField = null, labelPrefix = '', offset = 0, onProgress = () => {} }) {
+export async function loadLayer({ url, where = '1=1', bbox = null, limit = 10000, labelField = null, labelPrefix = '', generalize = 0, onProgress = () => {} }) {
   const info = await getJson(`${url}?f=json`);
   const pageSize = Math.min(info.maxRecordCount || 1000, 2000);
   const features = [];
@@ -331,8 +331,8 @@ export async function loadLayer({ url, where = '1=1', bbox = null, limit = 10000
       params.set('inSR', '4326');
       params.set('spatialRel', 'esriSpatialRelIntersects');
     }
-    // Previews ask the server for rougher shapes (offset is in degrees), which is many times faster for big areas.
-    if (offset > 0) params.set('maxAllowableOffset', String(offset));
+    // Previews ask the server for rougher shapes (tolerance in degrees), which is many times faster for big areas.
+    if (generalize > 0) params.set('maxAllowableOffset', String(generalize));
     let res;
     try {
       res = await getJson(`${url}/query`, {

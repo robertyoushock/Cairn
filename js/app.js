@@ -650,7 +650,7 @@ async function openDetail(d) {
         setLabelOptions(pickLabelFields(info.fields, info.displayField), entry.labelField);
         sel.value = entry.labelField || sel.value;
       }
-      const r = await loadLayer({ url, limit: 300, bbox: big ? mapBbox() : null, offset: big ? 0 : 0.003 });
+      const r = await loadLayer({ url, limit: 300, bbox: big ? mapBbox() : null, generalize: big ? 0 : 0.003 });
       sample = r.fc.features;
     } else {
       const r = await loadGeoJsonUrl({ url: entry.url, gz: !!entry.gz, labelField: entry.labelField, fixedLabel: entry.fixedLabel, limit: 300, relay: RELAY_URL });
