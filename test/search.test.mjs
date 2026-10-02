@@ -67,7 +67,11 @@ assert.equal(ids('nyc marathon')[0], 'marathon-nyc-course');
 assert.equal(ids('new york marathon')[0], 'marathon-nyc-course');
 assert.equal(ids('boston marathon')[0], 'marathon-boston-course');
 assert.equal(ids('miami marathon')[0], 'marathon-miami-course');
-for (const f of ['boston', 'new-york-city', 'miami', 'denver-colfax-2026']) {
+assert.equal(ids('houston marathon')[0], 'marathon-houston-course');
+assert.equal(ids('houston marathon water stations')[0], 'marathon-houston-water');
+assert.equal(ids('honolulu marathon')[0], 'marathon-honolulu-course');
+assert.equal(ids('philly marathon')[0], 'marathon-philadelphia-course');
+for (const f of ['boston', 'new-york-city', 'miami', 'denver-colfax-2026', 'houston', 'honolulu', 'philadelphia']) {
   const c = JSON.parse(fs.readFileSync(new URL(`../data/courses/${f}.geojson`, import.meta.url))).features[0];
   assert.ok(c.properties.miles > 26 && c.properties.miles < 27.1, `${f} is marathon length (${c.properties.miles} mi)`);
 }

@@ -187,13 +187,35 @@ it in `data/courses/`, add catalog entries for the course and any station layers
 and credit the source. `scripts/course_tools.py` has the helpers that wrote the existing files. Courses change
 most years; the catalog check cannot tell a stale course from a current one, so review them each season.
 
-Boston, New York City and Miami were traced with the Valhalla router (`costing: auto` with one-ways and access
-rules ignored, since race roads are closed), ten stops per request, one request a second. Boston was checked
-against an independent line and stayed within 80 meters of it. New York and Miami had no reference, only the
-26.2-mile check and known mile points, so treat those as the least certain; Miami runs about 3 percent long.
+Boston, New York City and Miami were traced with the Valhalla router using `costing: auto`, ten stops per
+request, one request a second. Boston was checked against an independent line and stayed within 80 meters of it.
+New York and Miami had no reference, only the 26.2-mile check and known mile points, so treat those as the least
+certain; Miami runs about 3 percent long.
+
+Houston, Honolulu and Philadelphia were traced later with `costing: pedestrian` (`shortest: true`), which is the
+better choice: the public Valhalla server does **not** honor `ignore_oneways` for `auto`, so a course that runs
+against traffic on a one-way street gets pushed a block over (Arch Street in Philadelphia came out on Race
+Street). Pedestrian routing ignores one-ways; use `auto` only for a stretch on a freeway. Because of this, New
+York and Miami may hide a block-long detour somewhere; retrace them with `pedestrian` when their courses are next
+reviewed. Things that bit while tracing:
+
+- The router takes the shortest way between two stops, not the race's way. Loops need a stop in the middle of
+  them (Hawaii Kai Drive in Honolulu, States Drive in Philadelphia).
+- A stop past a turn makes an out-and-back spur. Look for U-turns in the result.
+- Always look at the line on a map before saving it. Total length alone hid all three problems above.
+- What each was checked against: Houston, the organizer's 2026 refueling map (mile markers and stations read off
+  the picture; the traced line is 26.6 miles); Honolulu, the organizer's 2025 traffic advisory turn list
+  (26.3 miles, finish line position estimated); Philadelphia, the 2025 closure list and a mile-by-mile spectator
+  guide (26.6 miles; the West Fairmount Park section between Belmont Avenue and Black Road is a best guess).
+- Houston's refueling stations are points placed along the traced line at the mile positions shown on the
+  organizer's map. They are labelled approximate.
+
+Not done: **San Francisco**. The organizer publishes a picture and a Strava link (login needed) and the city's
+closure list names districts, not turns. The Golden Gate Bridge out-and-back and the Golden Gate Park loops
+cannot be traced honestly from that. If the organizer ever publishes a GPX or a turn list, it is a one-hour job.
 
 Sources that did not work: Garmin Connect courses (need a login), NYRR's course page (no data behind it),
-Overpass (timed out every time).
+Overpass (timed out every time), Strava routes (need a login).
 
 ### Automated checks
 
@@ -202,6 +224,9 @@ Overpass (timed out every time).
   every catalog source and every Census layer. When something is broken it opens (or comments on) an issue titled
   "Catalog check: sources need attention", which emails Robert. DeFlock puts a robot check in front of GitHub's
   servers, so that one source is reported as "could not check" rather than broken.
+- `.github/workflows/course-reminder.yml` runs `scripts/course-reminder.mjs` on January 4 each year and on
+  demand. It opens an issue titled "Marathon courses: yearly review (YEAR)" with a checkbox per race, oldest
+  course first, each linking to the organizer. Nothing else can tell a stale course from a current one.
 
 ### Ideas not yet discussed further
 

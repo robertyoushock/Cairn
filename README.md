@@ -23,7 +23,7 @@ There's no account, no ads and no tracking. Nothing is stored anywhere: your lis
 Public map data is easy to find and hard to trust. A normal search returns ten results with the same name: some are empty, some are tables with no shapes, and some label every shape with an ID number. Cairn does the checking for you.
 
 - **Verified first.** Census boundaries are understood from plain words ("boulder city limits colorado", "census tracts ohio"). A hand-checked catalog covers wildfires, earthquakes, flood zones, weather alerts, national parks and forests, trails, and license plate reader cameras.
-- **Marathon courses.** Search "denver marathon" or "nyc marathon" for the course, with water stations, mile markers and medical stations where the organizer publishes them. Eleven races so far: Denver, New York City, Boston, Miami, Los Angeles, Chicago, Marine Corps, Oklahoma City, Twin Cities, St. George and Anchorage.
+- **Marathon courses.** Search "denver marathon" or "nyc marathon" for the course, with water stations, mile markers and medical stations where the organizer publishes them. Fourteen races so far: Denver, New York City, Boston, Miami, Houston, Honolulu, Philadelphia, Los Angeles, Chicago, Marine Corps, Oklahoma City, Twin Cities, St. George and Anchorage. Six of them are traced by Cairn from the organizer's published course and say "approximate" on the result.
 - **Everything else is opened before you see it.** Each ArcGIS Online result is fetched and inspected. Empty layers, tables and duplicates are dropped. What's left says how many shapes it has, how fresh it is and who published it.
 - **Nearest first.** Results are ranked by distance from the last spot you clicked, then by last update, then by size. Search "fire stations" from Denver and you get Denver's.
 - **Names that make sense.** Many layers label shapes by the wrong field. One fire layer's default is the incident commander, which is blank. Cairn picks a real name field, shows you three sample names before you add anything, and lets you change it.
@@ -36,7 +36,8 @@ Public map data is easy to find and hard to trust. A normal search returns ten r
 - **Click the map** to list every ZIP code, city, school district, legislative district and county at that spot.
 - **Right-click** for a quick menu of the same, from census tract up to the whole state, each with a small outline of its shape. Click a row and it's in your list.
 - **Click what you've added** to inspect it, remove it, or keep only that one.
-- **Fill and outline colors** sit right next to the list, and the map follows them.
+- **Fill color, outline color and outline width** sit right next to the list, and the map follows them.
+- **No mouse needed.** With the map focused, Enter opens the same menu for the middle of the map. Every popup takes keyboard focus, reads its rows to a screen reader, and closes with Escape.
 
 ## Routes, including the flying part
 
@@ -54,7 +55,7 @@ Public map data is easy to find and hard to trust. A normal search returns ten r
 - **Filter the list** by a name or a state, then keep or remove the matches. "Colorado" also finds rows that only say CO.
 - **Know the size before you download.** Cairn estimates the file and warns you at the limits that bite: Google My Maps stops at 5 MB and 2,000 items.
 - **Four detail levels** round off corners without dropping anything. Colorado's 178 school districts go from 5.2 MB to 0.5 MB.
-- **Download for where you'll use it:** Google Earth or Google Maps (KML, KMZ), GPS watches and hiking apps (GPX), mapping software (GeoJSON). Colors, name labels and attributes carry into Google Earth.
+- **Download for where you'll use it:** Google Earth or Google Maps (KML, KMZ), GPS watches and hiking apps (GPX), mapping software (GeoJSON). Colors, outline width, name labels and attributes carry into Google Earth.
 
 ## Works on a phone too
 
@@ -82,7 +83,7 @@ Cairn is designed for a desk, where the map has room. On a phone the menu become
 - **Vetting happens live.** Search hits are probed in parallel and results appear as they pass.
 - **Census layers are found by name,** because their ID numbers change with every release.
 - **Pure functions, tested.** Conversion, simplification, search ranking, link parsing and the helper are covered by 8 test files that run with no network: `npm test`.
-- **Checks that run themselves.** GitHub runs the tests on every push. Once a week it opens every verified source and files an issue here if one has moved, emptied out or lost its name field.
+- **Checks that run themselves.** GitHub runs the tests on every push. Once a week it opens every verified source and files an issue here if one has moved, emptied out or lost its name field. Every January it files a checklist of the marathon courses and the year each one shows, because nothing else can tell a stale course from a current one.
 
 ### Staying free
 
@@ -126,6 +127,7 @@ The rules that keep it that way are at the top of [`docs/HANDOFF.md`](docs/HANDO
 | v4 | Routes, Google Maps links, list filter, colors and labels, detail levels, more verified sources, the helper |
 | v5 | Right-click pick menu, the cairn icon, phone layout, automated checks, this page |
 | v6 | Marathon courses with water stations and mile markers, a backup routing server |
+| v7 | Outline width, keyboard and screen-reader access for the map menus, a yearly course review, three more race cities |
 
 ## Run it yourself
 
@@ -136,7 +138,9 @@ npm start     # serves the folder; ES modules need a server
 
 Deploy is GitHub Pages from `main`. The optional helper is one file in [`worker/`](worker/). Adding a verified source is one entry in [`data/catalog.json`](data/catalog.json); the how-to is in the handoff document.
 
-**Not yet checked in a real browser:** short Google Maps links (maps.app.goo.gl) and the OpenRouteService backup, which needs a key that hasn't been added.
+**Not yet checked:** short Google Maps links (maps.app.goo.gl) in a real browser, the OpenRouteService backup (it needs a key that hasn't been added), and the popups with an actual screen reader (the roles, labels and focus order are in place, but nobody has listened to them yet).
+
+**Not included:** the San Francisco Marathon. Its organizer publishes no turn list and no map data, only a picture, so a traced course would be a guess through Golden Gate Park.
 
 ## Credits
 
