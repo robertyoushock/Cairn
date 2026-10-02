@@ -1,4 +1,4 @@
-import { geojsonToKml, geojsonToGpx, kmlToKmz, featureName, bboxOf } from './convert.js';
+import { geojsonToKml, geojsonToGpx, kmlToKmz, featureName, bboxOf, bboxOfMost } from './convert.js';
 import { basemapStyle } from './basemap.js';
 import {
   STATES, BOUNDARY_TYPES, queryBoundaries, identifyAt, searchPlaces, cleanAddress,
@@ -119,7 +119,7 @@ function addFeatures(features, { zoom = true } = {}) {
     if (!selection.has(key)) { selection.set(key, f); added++; }
   }
   renderSelection();
-  if (zoom && features.length) { fit(bboxOf({ features })); setMode('list'); }
+  if (zoom && features.length) { fit(bboxOfMost({ features })); setMode('list'); }
   return added;
 }
 
@@ -195,7 +195,7 @@ $('filter-keep').addEventListener('click', () => {
   for (const k of [...selection.keys()]) if (!keep.has(k)) selection.delete(k);
   $('list-filter').value = '';
   renderSelection(); refreshHere();
-  fit(bboxOf({ features: shown }));
+  fit(bboxOfMost({ features: shown }));
   status(`Kept ${plural(shown.length, 'item', 'items')}.`);
 });
 $('filter-remove').addEventListener('click', () => {

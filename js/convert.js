@@ -263,3 +263,21 @@ export function bboxOf(fc) {
   (fc.features || []).forEach((f) => geoms(f.geometry).forEach((g) => walk(g.coordinates)));
   return minX === Infinity ? null : [minX, minY, maxX, maxY];
 }
+
+// Like bboxOf, but ignores the few strays that sit far from everything else (a fire record with a
+// mistyped longitude should not zoom the map out to the whole world). Small lists are used as they are.
+export function bboxOfMost(fc) {
+  const feats = (fc.features || []).filter((f) => f.geometry);
+  if (feats.length < 40) return bboxOf(fc);
+  const boxes = feats.map((f) => bboxOf({ features: [f] })).filter(Boolean);
+  const mid = boxes.map((b) => [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]);
+  const pick = (i, q) => mid.map((m) => m[i]).sort((a, b) => a - b)[Math.min(mid.length - 1, Math.floor(q * mid.length))];
+  const [x0, x1, y0, y1] = [pick(0, 0.02), pick(0, 0.98), pick(1, 0.02), pick(1, 0.98)];
+  const out = [Infinity, Infinity, -Infinity, -Infinity];
+  boxes.forEach((b, i) => {
+    const [x, y] = mid[i];
+    if (x < x0 || x > x1 || y < y0 || y > y1) return;
+    out[0] = Math.min(out[0], b[0]); out[1] = Math.min(out[1], b[1]); out[2] = Math.max(out[2], b[2]); out[3] = Math.max(out[3], b[3]);
+  });
+  return out[0] === Infinity ? bboxOf(fc) : out;
+}

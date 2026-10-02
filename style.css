@@ -186,6 +186,7 @@ label.fmt small { display: block; }
 #find-results h3 { margin: 14px 0 6px; font-size: 14px; }
 .results .t { font-weight: 700; display: block; }
 .results .s { white-space: normal; }
+.picklist.results { max-height: none; }
 .badge { display: inline-block; font-size: 11px; font-weight: 700; background: var(--tape); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
 .badge.soft { background: var(--fog); border: 1px solid var(--line); font-weight: 500; }
 .warn { background: #fff4d6; border: 1px solid var(--tape); border-radius: var(--radius); padding: 8px 10px; margin: 0; }
@@ -267,15 +268,17 @@ input[type='range'] { width: 100%; }
 /* ---- Phones: map on top, menu as a bottom sheet, one button to switch ---- */
 @media (max-width: 760px) {
   html, body { height: 100dvh; }
-  .app { height: 100dvh; }
-  .panel { max-height: 62dvh; padding: 14px 14px 10px; gap: 14px; border-radius: 14px 14px 0 0; }
+  /* The map gets the space above the sheet, so its center (and whatever was just found) is never hidden under it. */
+  .app { height: 100dvh; grid-template-rows: minmax(0, 1fr) auto; }
+  .stage { grid-area: 1 / 1; min-height: 0; }
+  .panel { grid-area: 2 / 1; height: 58dvh; max-height: 58dvh; padding: 14px 14px 10px; gap: 14px; border-radius: 14px 14px 0 0; margin-top: -12px; }
   .brand p { display: none; }
   .brand h1 { font-size: 22px; }
   .brand h1 img { width: 24px; height: 24px; }
   /* 16px stops iPhones from zooming the page when a field is tapped */
   input[type='text'], input[type='url'], input[type='search'], select, textarea { font-size: 16px; }
-  .sheet-toggle { top: auto; left: auto; right: 12px; bottom: calc(62dvh + 10px); border-radius: 999px; padding: 9px 16px; box-shadow: 0 2px 8px rgba(0,0,0,.25); cursor: pointer; }
-  .panel-closed .sheet-toggle { bottom: 34px; background: var(--tape); }
+  .sheet-toggle { top: auto; left: auto; right: 12px; bottom: 24px; border-radius: 999px; padding: 9px 16px; box-shadow: 0 2px 8px rgba(0,0,0,.25); cursor: pointer; }
+  .panel-closed .sheet-toggle { bottom: 38px; background: var(--tape); }
   .modebar { top: 8px; left: 8px; }
   .modebar button { padding: 7px 11px; font-size: 14px; }
   .maplibregl-ctrl-top-right { top: 44px; }

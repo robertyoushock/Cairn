@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { geojsonToKml, kmlColor, labelPoint } from '../js/convert.js';
+import { geojsonToKml, kmlColor, labelPoint, bboxOf, bboxOfMost } from '../js/convert.js';
 import { simplifyLine, simplifyCollection, countPoints, estimateBytes, prettyBytes, sizeWarnings } from '../js/simplify.js';
 import { makeMatcher, filterFeatures } from '../js/listfilter.js';
 
@@ -72,5 +72,13 @@ assert.deepEqual(names('coco'), ['Coconino Rim']);
 assert.deepEqual(names('luna, pogo'), ['Luna', 'Pogo'], 'commas mean either');
 assert.deepEqual(names(''), ['Luna', 'Coconino Rim', 'Pogo', 'Shaw']);
 assert.equal(makeMatcher('zzz')(fires[0]), false);
+
+// ---- zoom ignores a stray far from everything else ----
+const pts = Array.from({ length: 100 }, (_, i) => ({ geometry: { type: 'Point', coordinates: [-105 + (i % 10) * 0.1, 39 + Math.floor(i / 10) * 0.1] } }));
+pts.push({ geometry: { type: 'Point', coordinates: [105, -39] } });
+assert.equal(bboxOf({ features: pts })[2], 105, 'the plain box reaches the stray');
+const most = bboxOfMost({ features: pts });
+assert.ok(most[0] >= -105 && most[2] <= -104 && most[1] >= 39 && most[3] <= 40, `robust box is ${most}`);
+assert.deepEqual(bboxOfMost({ features: pts.slice(0, 5) }), bboxOf({ features: pts.slice(0, 5) }), 'small lists are untouched');
 
 console.log('export checks passed');
