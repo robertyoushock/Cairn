@@ -39,6 +39,9 @@ assert.equal(boundaryResult('census tracts colorado').type, 'tract');
 const pj = boundaryResult('parcels jefferson county colorado');
 assert.equal(pj.loose, true, 'extra words keep the wider search running');
 assert.equal(boundaryResult('counties in Ohio').loose, false);
+assert.equal(boundaryResult('colorado state outline').type, 'state');
+assert.equal(boundaryResult('outline of jefferson county colorado').type, 'county');
+assert.equal(boundaryResult('texas state house').type, 'sldl');
 
 // ---- catalog search ----
 const cat = JSON.parse(fs.readFileSync(new URL('../data/catalog.json', import.meta.url)));

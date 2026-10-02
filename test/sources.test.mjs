@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { queryBoundaries, identifyAt, decorate, searchPlaces, cleanAddress, inspectUrl } from '../js/sources.js';
+import { queryBoundaries, identifyAt, decorate, searchPlaces, cleanAddress, inspectUrl, PICK_ORDER, fullFeature } from '../js/sources.js';
 
 const calls = [];
 globalThis.fetch = async (url, init) => {
@@ -24,6 +24,7 @@ globalThis.fetch = async (url, init) => {
       { id: 3, name: 'Counties', parentLayerId: -1, type: 'Feature Layer', maxScale: 42001 },
     ] });
   if (u.includes('/State_County/MapServer/1?f=json')) return json({ fields: [{ name: 'BASENAME' }, { name: 'STATE' }] });
+  if (u.includes('/State_County/MapServer/0?f=json')) return json({ fields: [{ name: 'BASENAME' }, { name: 'STATE' }] });
   if (u.includes('/School/MapServer?f=json'))
     return json({ layers: [
       { id: 0, name: 'Unified School Districts', parentLayerId: -1, type: 'Feature Layer', maxScale: 1001 },
@@ -97,6 +98,21 @@ assert.equal(pointCalls.length, 7);
 assert.ok(pointCalls.every((c) => c.body.geometryType === 'esriGeometryPoint' && c.body.geometry === '-104.99,39.74'));
 assert.equal(id.failed, 0);
 assert.ok(id.features.length >= 1 && id.features.every((f) => f.properties._key));
+
+// right-click menu: every level from tract to state, asked for as rough shapes, upgraded to full when picked
+await queryBoundaries({ type: 'state', input: '', state: '08', bbox: null });
+assert.equal(last().where, "STATE = '08'");
+const pb = calls.length;
+const pick = await identifyAt(-104.99, 39.74, { types: PICK_ORDER, generalize: 0.002 });
+const pc = calls.slice(pb).filter((c) => c.u.endsWith('/query'));
+assert.equal(pc.length, 9);
+assert.ok(pc.every((c) => c.body.maxAllowableOffset === '0.002'));
+assert.ok(pick.features.every((f) => f.properties._rough && f.properties._url));
+const full = await fullFeature(pick.features[0]);
+assert.equal(last().where, "GEOID = '80202'");
+assert.equal(last().maxAllowableOffset, undefined, 'the picked shape is fetched at full detail');
+assert.ok(!full.properties._rough);
+assert.equal(await fullFeature(full), full, 'a full shape is left alone');
 
 // place search: bbox order is converted to [west, south, east, north]
 const realFetch = globalThis.fetch;

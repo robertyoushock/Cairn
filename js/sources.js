@@ -83,6 +83,15 @@ export const BOUNDARY_TYPES = {
     hint: 'Enter tract numbers like 34.02, separated by commas. Leave blank for the whole state (first 2,000).',
     placeholder: '34.02, 36.02',
   },
+  state: {
+    label: 'States',
+    service: 'State_County',
+    layer: /^States$/i,
+    needsState: true,
+    noInput: true,
+    hint: 'Adds the outline of the whole state.',
+    placeholder: '',
+  },
   county: {
     label: 'Counties',
     service: 'State_County',
@@ -190,8 +199,14 @@ const ZIP_FIELDS = 'GEOID,BASENAME,NAME,AREALAND,AREAWATER,INTPTLAT,INTPTLON,POP
 const ID_ORDER = ['zip', 'place', 'school', 'sldl', 'sldu', 'cd', 'county'];
 
 // What boundaries cover this exact point? Asks every Census layer at once; a layer that fails is skipped.
-export async function identifyAt(lng, lat) {
-  const jobs = ID_ORDER.map(async (type) => {
+// Smallest to largest: the order used by the right-click "Pick an area" menu.
+export const PICK_ORDER = ['tract', 'zip', 'place', 'school', 'sldl', 'sldu', 'cd', 'county', 'state'];
+
+const idFields = (type) => (type === 'zip' ? ZIP_FIELDS : '*');
+
+// types: which layers to ask. generalize: tolerance in degrees for rough, fast shapes (0 = full detail).
+export async function identifyAt(lng, lat, { types = ID_ORDER, generalize = 0 } = {}) {
+  const jobs = types.map(async (type) => {
     const layer = await resolveLayer(type);
     const params = new URLSearchParams({
       geometry: `${lng},${lat}`,
@@ -199,23 +214,41 @@ export async function identifyAt(lng, lat) {
       inSR: '4326',
       spatialRel: 'esriSpatialRelIntersects',
       where: '1=1',
-      outFields: type === 'zip' ? ZIP_FIELDS : '*',
+      outFields: idFields(type),
       outSR: '4326',
       returnGeometry: 'true',
       geometryPrecision: '6',
       f: 'geojson',
     });
+    if (generalize > 0) params.set('maxAllowableOffset', String(generalize));
     const fc = await getJson(`${layer.url}/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params,
     });
-    return (fc.features || []).map((f) => decorate(type, f));
+    return (fc.features || []).map((f) => {
+      const d = decorate(type, f);
+      d.properties._url = layer.url;
+      if (generalize > 0) d.properties._rough = true;
+      return d;
+    });
   });
   const settled = await Promise.allSettled(jobs);
   const features = settled.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
   const failed = settled.filter((r) => r.status === 'rejected').length;
   return { features, failed };
+}
+
+// Swap a rough shape from the pick menu for the full-detail one before it goes in the list.
+export async function fullFeature(f) {
+  const p = f.properties || {};
+  if (!p._rough || !p._url || !p.GEOID) return f;
+  const params = new URLSearchParams({
+    where: `GEOID = ${sqlStr(p.GEOID)}`, outFields: idFields(p._type), outSR: '4326', returnGeometry: 'true', geometryPrecision: '6', f: 'geojson',
+  });
+  const fc = await getJson(`${p._url}/query`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params });
+  if (!fc.features?.length) throw new Error('The Census server did not return that area. Try again.');
+  return decorate(p._type, fc.features[0]);
 }
 
 export async function queryBoundaries({ type, state, input, bbox }) {

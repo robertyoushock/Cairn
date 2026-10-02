@@ -2,7 +2,7 @@ import { geojsonToKml, geojsonToGpx, kmlToKmz, featureName, bboxOf } from './con
 import { basemapStyle } from './basemap.js';
 import {
   STATES, BOUNDARY_TYPES, queryBoundaries, identifyAt, searchPlaces, cleanAddress,
-  searchPortal, inspectUrl, loadLayer, loadGeoJsonUrl, applyLabels, getJson,
+  searchPortal, inspectUrl, loadLayer, loadGeoJsonUrl, applyLabels, getJson, PICK_ORDER, fullFeature,
 } from './sources.js';
 import { boundaryResult } from './intent.js';
 import { loadCatalog, searchCatalog } from './catalog.js';
@@ -25,6 +25,7 @@ const KIND = {
   sldu: 'State senate district',
   cd: 'Congressional district',
   county: 'County',
+  state: 'State',
   route: 'Route',
   place: 'City or town',
   school: 'School district',
@@ -39,6 +40,7 @@ const CARD_COPY = {
   place: ['Cities and towns', 'City limits'],
   school: ['School districts', 'Like Jeffco Schools'],
   tract: ['Census tracts', 'Small statistical areas'],
+  state: ['States', 'Whole-state outline'],
 };
 
 // ---------- Map ----------
@@ -351,6 +353,92 @@ map.on('mousemove', (e) => {
   map.getCanvas().style.cursor = map.queryRenderedFeatures(e.point, { layers: DATA_LAYERS }).length ? 'pointer' : '';
 });
 
+// ---------- Right-click: pick an area ----------
+// A small outline of the shape, so "Denver County" and "Colorado" are recognisable at a glance.
+function shapeIcon(g) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '22');
+  svg.setAttribute('height', '22');
+  svg.setAttribute('aria-hidden', 'true');
+  const polys = !g ? [] : g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+  const box = bboxOf({ features: [{ geometry: g }] });
+  if (!polys.length || !box) return svg;
+  // Squash longitude by the cosine of the latitude so shapes look the way they do on the map.
+  const k = Math.cos(((box[1] + box[3]) / 2) * Math.PI / 180);
+  const w = (box[2] - box[0]) * k || 1e-9;
+  const h = box[3] - box[1] || 1e-9;
+  const s = 20 / Math.max(w, h);
+  const ox = 2 + (20 - w * s) / 2;
+  const oy = 2 + (20 - h * s) / 2;
+  let d = '';
+  for (const poly of polys) for (const ring of poly) {
+    const step = Math.max(1, Math.floor(ring.length / 120));
+    ring.forEach((c, n) => {
+      if (n % step && n !== ring.length - 1) return;
+      d += `${d && n === 0 ? ' ' : ''}${n === 0 ? 'M' : 'L'}${(ox + (c[0] - box[0]) * k * s).toFixed(1)} ${(oy + (box[3] - c[1]) * s).toFixed(1)}`;
+    });
+    d += 'Z';
+  }
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('fill', 'currentColor');
+  path.setAttribute('fill-rule', 'evenodd');
+  svg.append(path);
+  return svg;
+}
+
+let pickToken = 0;
+async function pickMenu(lngLat) {
+  const token = ++pickToken;
+  if (popup) popup.remove();
+  const head = el('div', { className: 'pick-head', textContent: 'Pick an area' });
+  const list = el('ul', { className: 'pick-list' }, el('li', { className: 'pick-note', textContent: 'Looking up this spot…' }));
+  const wrap = el('div', { className: 'pick' }, head, list);
+  const mine = new maplibregl.Popup({ maxWidth: '320px', className: 'pick-pop' }).setLngLat(lngLat).setDOMContent(wrap).addTo(map);
+  popup = mine;
+  mine.on('close', () => { if (popup === mine) popup = null; setPreview(null); });
+  // Rough shapes come back in a fraction of the time; the full shape is fetched when one is picked.
+  const { features, failed } = await identifyAt(lngLat.lng, lngLat.lat, { types: PICK_ORDER, generalize: 0.002 }).catch(() => ({ features: [], failed: PICK_ORDER.length }));
+  if (token !== pickToken || popup !== mine) return;
+  list.replaceChildren();
+  if (!features.length) {
+    list.append(el('li', { className: 'pick-note', textContent: failed ? 'The Census server did not answer. Right-click again in a moment.' : 'No US areas here. Try a spot inside the United States.' }));
+    return;
+  }
+  features.forEach((f) => {
+    const have = () => selection.has(f.properties._key);
+    const b = el('button', { type: 'button' }, shapeIcon(f.geometry), el('span', { className: 'pn', textContent: featureName(f) }), el('span', { className: 'pk', textContent: have() ? 'Added' : KIND[f.properties._type] }));
+    b.addEventListener('mouseenter', () => setPreview(f));
+    b.addEventListener('mouseleave', () => setPreview(null));
+    b.addEventListener('click', async () => {
+      if (have() || b.disabled) return;
+      b.disabled = true;
+      b.querySelector('.pk').textContent = 'Adding…';
+      try {
+        const full = await fullFeature(f);
+        addFeatures([full], { zoom: false });
+        refreshHere();
+        b.querySelector('.pk').textContent = 'Added';
+        b.classList.add('done');
+        status(`Added ${featureName(full)}. Pick more, or close the menu.`);
+      } catch (e) {
+        b.disabled = false;
+        b.querySelector('.pk').textContent = KIND[f.properties._type];
+        status(e.message, 'error');
+      }
+    });
+    if (have()) { b.disabled = true; b.classList.add('done'); }
+    list.append(el('li', {}, b));
+  });
+  if (failed) list.append(el('li', { className: 'pick-note', textContent: 'Some areas could not be loaded. Right-click again to retry.' }));
+}
+map.on('contextmenu', (e) => {
+  e.preventDefault();
+  pickMenu(e.lngLat);
+});
+
 // ---------- Search a place / my location ----------
 $('place-form').addEventListener('submit', (e) => {
   e.preventDefault();
@@ -426,10 +514,12 @@ function chooseType(type) {
   const t = BOUNDARY_TYPES[type];
   $('type-title').textContent = CARD_COPY[type][0];
   $('t-state-wrap').hidden = !t.needsState;
+  $('t-input').closest('label').hidden = Boolean(t.noInput);
+  if (t.noInput) $('t-input').value = '';
   $('t-input').placeholder = t.placeholder;
   $('t-hint').textContent = t.hint;
   $('t-label').textContent = { county: 'County names', zip: 'ZIP codes', place: 'City or town names', school: 'District names', tract: 'Tract numbers' }[type] || 'District numbers';
-  $('t-input').focus();
+  if (!t.noInput) $('t-input').focus();
 }
 $('type-cancel').addEventListener('click', () => chooseType(null));
 

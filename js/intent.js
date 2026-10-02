@@ -38,6 +38,8 @@ const TYPE_RULES = [
   ['county', /\b(counties|county)\b/],
   ['zip', /\b(zip\s*codes?|zips|zcta|postal\s+codes?)\b/],
   ['place', /\b(city\s+limits?|city\s+boundar(?:y|ies)|cities|towns|municipalit(?:y|ies)|municipal\s+boundar(?:y|ies)|incorporated\s+places?|town\s+limits?)\b/],
+  // Last on purpose: "outline of jefferson county" should be read as a county.
+  ['state', /\b(state\s+(?:outline|boundary|boundaries|border|borders|line|lines|shape)|outline\s+of)\b/],
 ];
 
 const NAMED = new Set(['school', 'place', 'county']);
@@ -75,6 +77,7 @@ export const TYPE_TITLES = {
   place: 'Cities and towns',
   school: 'School districts',
   tract: 'Census tracts',
+  state: 'States',
 };
 
 // A "Verified" result for Census boundaries, or null when the search is not about them.
@@ -94,6 +97,7 @@ export function boundaryResult(raw) {
   if (!stateName) {
     return { kind: 'boundary-form', type, state: null, input: names.join(', '), title: TYPE_TITLES[type], sub: 'Choose a state to continue' };
   }
+  if (type === 'state') return { kind: 'boundary', type, state, input: '', title: `${stateName} state outline`, sub: 'U.S. Census Bureau' };
   const picked = numbers.length ? numbers.map((n) => `#${n}`).join(', ') : names.join(', ');
   const detail = picked ? `: ${picked}` : ' (all)';
   return {
