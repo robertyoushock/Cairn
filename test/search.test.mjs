@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { parseIntent, boundaryResult, findState } from '../js/intent.js';
 import { scoreEntry, searchCatalog, tokenize } from '../js/catalog.js';
-import { pickLabelFields, scoreCandidate, dedupe, displayTitle, describeCandidate, distanceToBox, sortCandidates } from '../js/vet.js';
+import { pickLabelFields, scoreCandidate, dedupe, displayTitle, describeCandidate, distanceToBox, sortCandidates, sourceLink } from '../js/vet.js';
 import { applyLabels } from '../js/sources.js';
 
 // ---- plain-language intent ----
@@ -104,5 +104,9 @@ assert.equal(order[2], 'here-old-big');
 assert.equal(order.at(-1), 'unknown', 'unknown footprint sorts last');
 assert.match(describeCandidate({ ...base, distKm: 0 }), /covers this spot/);
 assert.match(describeCandidate({ ...base, distKm: 100 }), /62 mi away/);
+
+assert.equal(sourceLink({ itemId: 'abc123', url: 'https://x/FeatureServer/0' }), 'https://www.arcgis.com/home/item.html?id=abc123');
+assert.equal(sourceLink({ url: 'https://x/FeatureServer/0' }), 'https://x/FeatureServer/0');
+for (const e of cat.entries) assert.ok(e.page || e.url, `${e.id} has a source page`);
 
 console.log('search checks passed');

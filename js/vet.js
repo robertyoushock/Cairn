@@ -98,6 +98,7 @@ async function probeLayer(layerUrl, item, layerNameFallback, near) {
   }
   return {
     distKm,
+    itemId: item.id || '',
     url: layerUrl,
     itemTitle: item.title,
     layerName: info.name || layerNameFallback,
@@ -135,6 +136,9 @@ export async function probeItem(item, query = '', near = null) {
     return [];
   }
 }
+
+// Where a person can read about the dataset: its ArcGIS item page when we know it, else the layer's own page.
+export const sourceLink = (c) => (c.itemId ? `https://www.arcgis.com/home/item.html?id=${encodeURIComponent(c.itemId)}` : c.url);
 
 export function displayTitle(c) {
   return c.multi && c.layerName && c.layerName !== c.itemTitle ? `${c.itemTitle}: ${c.layerName}` : c.itemTitle || c.layerName;

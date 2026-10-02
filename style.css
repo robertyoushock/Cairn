@@ -206,3 +206,10 @@ label.fmt small { display: block; }
 .hits .acts button { font-size: 12px; padding: 4px 9px; cursor: pointer; }
 .hits dl { margin: 6px 0 0; font-size: 12px; display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; }
 .hits dt { color: var(--ink-soft); } .hits dd { margin: 0; word-break: break-word; }
+
+/* ---- Source links ---- */
+.results li { display: flex; align-items: stretch; }
+.results li > button { flex: 1; min-width: 0; }
+.src { display: inline-flex; align-items: center; gap: 4px; padding: 0 12px; border-left: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.src:hover, .src:focus-visible { background: var(--tape-soft); color: var(--ink); }
+.src.inline { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }

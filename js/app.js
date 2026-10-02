@@ -6,7 +6,7 @@ import {
 } from './sources.js';
 import { boundaryResult } from './intent.js';
 import { loadCatalog, searchCatalog } from './catalog.js';
-import { vetResults, pickLabelFields, displayTitle, describeCandidate } from './vet.js';
+import { vetResults, pickLabelFields, displayTitle, describeCandidate, sourceLink } from './vet.js';
 import { RELAY_URL } from './config.js';
 
 const $ = (id) => document.getElementById(id);
@@ -389,13 +389,22 @@ for (const c of CHIPS) {
 let findToken = 0;
 let detail = null; // what is open in the preview panel
 
-function resultRow(title, sub, badge, onPick) {
+const ARROW = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>';
+function sourceAnchor(href, label, className = 'src') {
+  if (!href) return null;
+  const a = el('a', { href, target: '_blank', rel: 'noopener noreferrer', className, title: 'Open the source in a new tab' });
+  a.setAttribute('aria-label', `Open source: ${label}`);
+  a.innerHTML = `<span>Source</span>${ARROW}`;
+  return a;
+}
+
+function resultRow(title, sub, badge, onPick, href) {
   const t = el('span', { className: 't', textContent: title });
   if (badge) t.append(el('span', { className: badge.soft ? 'badge soft' : 'badge', textContent: badge.text }));
   const b = el('button', { type: 'button' }, t);
   if (sub) b.append(el('span', { className: 's', textContent: sub }));
   b.addEventListener('click', onPick);
-  return el('li', {}, b);
+  return el('li', {}, b, sourceAnchor(href, title));
 }
 
 function showResults() {
@@ -424,9 +433,9 @@ $('find-form').addEventListener('submit', (e) => {
     const b = boundaryResult(text);
     const cat = searchCatalog(entries, text);
     if (b) {
-      verified.append(resultRow(b.title, b.sub, { text: 'Verified' }, () => pickBoundary(b)));
+      verified.append(resultRow(b.title, b.sub, { text: 'Verified' }, () => pickBoundary(b), 'https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_main.html'));
     }
-    cat.forEach((en) => verified.append(resultRow(en.title, `${en.agency} · ${en.freshness || ''}`.replace(/ · $/, ''), { text: 'Verified' }, () => openDetail({ source: 'catalog', entry: en }))));
+    cat.forEach((en) => verified.append(resultRow(en.title, `${en.agency} · ${en.freshness || ''}`.replace(/ · $/, ''), { text: 'Verified' }, () => openDetail({ source: 'catalog', entry: en }), en.page || en.url)));
     const nVerified = verified.children.length;
     $('r-verified-h').hidden = verified.hidden = nVerified === 0;
 
@@ -453,7 +462,7 @@ async function searchArcgis(text, token, cat) {
     if (token !== findToken) return;
     more.replaceChildren();
     cands.filter((c) => !known.has(c.url)).slice(0, 8).forEach((c) => {
-      more.append(resultRow(displayTitle(c), describeCandidate(c), c.authoritative ? { text: 'Authoritative' } : null, () => openDetail({ source: 'arcgis', cand: c })));
+      more.append(resultRow(displayTitle(c), describeCandidate(c), c.authoritative ? { text: 'Authoritative' } : null, () => openDetail({ source: 'arcgis', cand: c }), sourceLink(c)));
     });
   };
   const items = await searchPortal('https://www.arcgis.com', text, 'all');
@@ -507,6 +516,7 @@ async function openDetail(d) {
   $('find-results').hidden = true;
   $('detail').hidden = false;
   $('detail-title').textContent = title;
+  $('detail-source').replaceChildren(sourceAnchor(entry ? entry.page || entry.url : sourceLink(cand), title, 'src inline') || '');
   $('detail-meta').textContent = entry ? `${entry.description} Source: ${entry.attribution}.` : `${describeCandidate(cand)}${cand.copyright ? `. ${cand.copyright.slice(0, 120)}` : ''}`;
   const warn = $('detail-warn');
   const add = $('detail-add');
