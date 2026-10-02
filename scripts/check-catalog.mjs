@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { BOUNDARY_TYPES } from '../js/sources.js';
+import { RELAY_URL } from '../js/config.js';
 
 const TIGER = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb';
 const catalog = JSON.parse(fs.readFileSync(new URL('../data/catalog.json', import.meta.url)));
@@ -43,7 +44,9 @@ export async function checkArcgis(entry, get = getJson) {
 }
 
 export async function checkGeojson(entry) {
-  const res = await fetch(entry.url, { signal: AbortSignal.timeout(120000) });
+  // Sources that block browsers are checked the way visitors reach them: through Cairn's helper.
+  const url = entry.needsRelay && RELAY_URL ? `${RELAY_URL.replace(/\/+$/, '')}/?url=${encodeURIComponent(entry.url)}` : entry.url;
+  const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
   if (!res.ok) return `answered ${res.status}`;
   let buf = Buffer.from(await res.arrayBuffer());
   if (buf[0] === 0x1f && buf[1] === 0x8b) buf = gunzipSync(buf);
