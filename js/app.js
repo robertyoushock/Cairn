@@ -539,14 +539,25 @@ async function searchArcgis(text, token, cat) {
       more.append(resultRow(displayTitle(c), describeCandidate(c), c.authoritative ? { text: 'Authoritative' } : null, () => openDetail({ source: 'arcgis', cand: c }), sourceLink(c)));
     });
   };
-  const items = await searchPortal('https://www.arcgis.com', text, 'all');
+  // Two searches at once: one limited to the area around the last spot, one everywhere. Local results go first
+  // so they are sure to be checked; worldwide layers that merely overlap the spot are pushed back.
+  const near = lastSpot;
+  const [local, global] = await Promise.all([
+    near ? searchPortal('https://www.arcgis.com', text, 'all', near).catch(() => []) : [],
+    searchPortal('https://www.arcgis.com', text, 'all'),
+  ]);
   if (token !== findToken) return;
+  const span = (it) => (it.extent && it.extent.length === 2 ? Math.abs(it.extent[1][0] - it.extent[0][0]) : 360);
+  const localFirst = local.filter((it) => span(it) < 20).sort((x, y) => span(x) - span(y)).slice(0, 10);
+  const seen = new Set(localFirst.map((it) => it.id));
+  const items = [...localFirst, ...global.filter((it) => !seen.has(it.id))];
   if (!items.length) {
     prog.textContent = 'Nothing on ArcGIS Online matched. Try fewer or simpler words.';
     return status(cat.length ? 'Pick a verified result.' : 'No matches. Try simpler words.', cat.length ? '' : 'error');
   }
   const final = await vetResults(items, text, {
     near: lastSpot || (() => { const c = map.getCenter(); return { lng: c.lng, lat: c.lat }; })(),
+    max: 18,
     onFound: render,
     onProgress: (d, n) => { if (token === findToken) prog.textContent = `Checking results… ${d} of ${n}`; },
   });

@@ -259,7 +259,9 @@ export async function queryBoundaries({ type, state, input, bbox }) {
 
 // ---------- Generic ArcGIS ----------
 
-export async function searchPortal(portal, text, kind) {
+// near: optional { lng, lat }. When given, only items whose stated coverage touches that area are returned,
+// which is how a search for "fire stations" finds the ones around the spot the person clicked.
+export async function searchPortal(portal, text, kind, near = null) {
   const base = (portal || 'https://www.arcgis.com').replace(/\/+$/, '').replace(/\/sharing\/rest$/, '');
   const types =
     kind === 'all'
@@ -270,6 +272,7 @@ export async function searchPortal(portal, text, kind) {
   const q = `${text} ${types}`;
   // Default ordering is by relevance, which suits plain-language searches better than popularity.
   const p = new URLSearchParams({ q, num: '25', f: 'json' });
+  if (near) p.set('bbox', [near.lng - 0.4, near.lat - 0.3, near.lng + 0.4, near.lat + 0.3].map((n) => n.toFixed(3)).join(','));
   const json = await getJson(`${base}/sharing/rest/search?${p}`);
   return (json.results || []).map((r) => ({
     id: r.id,
@@ -279,6 +282,10 @@ export async function searchPortal(portal, text, kind) {
     type: r.type,
     snippet: r.snippet || '',
     views: r.numViews,
+    numViews: r.numViews,
+    modified: r.modified,
+    contentStatus: r.contentStatus || '',
+    extent: r.extent || null,
   }));
 }
 
