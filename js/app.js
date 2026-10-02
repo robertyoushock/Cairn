@@ -396,7 +396,7 @@ async function pickMenu(lngLat) {
   const head = el('div', { className: 'pick-head', textContent: 'Pick an area' });
   const list = el('ul', { className: 'pick-list' }, el('li', { className: 'pick-note', textContent: 'Looking up this spot…' }));
   const wrap = el('div', { className: 'pick' }, head, list);
-  const mine = new maplibregl.Popup({ maxWidth: '320px', className: 'pick-pop' }).setLngLat(lngLat).setDOMContent(wrap).addTo(map);
+  const mine = new maplibregl.Popup({ maxWidth: '380px', className: 'pick-pop' }).setLngLat(lngLat).setDOMContent(wrap).addTo(map);
   popup = mine;
   mine.on('close', () => { if (popup === mine) popup = null; setPreview(null); });
   // Rough shapes come back in a fraction of the time; the full shape is fetched when one is picked.

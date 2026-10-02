@@ -243,14 +243,15 @@ input[type='range'] { width: 100%; }
 /* ---- Right-click "Pick an area" menu ---- */
 .pick-pop .maplibregl-popup-content { padding: 0; border-radius: 10px; border: 1px solid var(--ink); box-shadow: 0 6px 22px rgba(0,0,0,.25); overflow: hidden; }
 .pick-pop .maplibregl-popup-close-button { font-size: 20px; padding: 6px 10px; }
-.pick { font-family: inherit; min-width: 250px; }
+.pick { font-family: inherit; min-width: min(310px, 78vw); }
 .pick-head { font-weight: 900; font-size: 15px; padding: 11px 14px; border-bottom: 1px solid var(--line); }
-.pick-list { list-style: none; margin: 0; padding: 4px 0; max-height: 320px; overflow-y: auto; }
+.pick-list { list-style: none; margin: 0; padding: 4px 0; max-height: 380px; overflow-y: auto; }
 .pick-list button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 14px; border: 0; background: none; text-align: left; cursor: pointer; color: var(--ink); font-size: 14px; }
 .pick-list button:hover, .pick-list button:focus-visible { background: var(--tape-soft); }
 .pick-list button svg { flex: none; }
-.pick-list .pn { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pick-list .pk { color: var(--ink-soft); font-size: 13px; white-space: nowrap; margin-left: auto; padding-left: 8px; }
+.pick-list .pn { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+.pick-list .pk { color: var(--ink-soft); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 100 auto; min-width: 0; }
+.pick-list .pk::before { content: '— '; }
 .pick-list button.done { cursor: default; }
 .pick-list button.done .pk { color: var(--ink); font-weight: 700; }
 .pick-note { padding: 10px 14px; color: var(--ink-soft); font-size: 13px; }
