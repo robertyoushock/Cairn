@@ -46,8 +46,8 @@ export async function checkArcgis(entry, get = getJson) {
 export async function checkGeojson(entry) {
   // Sources that block browsers are checked the way visitors reach them: through Cairn's helper.
   const url = entry.needsRelay && RELAY_URL ? `${RELAY_URL.replace(/\/+$/, '')}/?url=${encodeURIComponent(entry.url)}` : entry.url;
-  const res = await fetch(url, { signal: AbortSignal.timeout(120000) });
-  if (!res.ok) return `answered ${res.status}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(120000), headers: { 'User-Agent': 'cairn-catalog-check (github.com/robertyoushock/cairn)' } });
+  if (!res.ok) return `answered ${res.status} (asked ${new URL(url).host}; reply began: ${(await res.text().catch(() => '')).slice(0, 120).replace(/\s+/g, ' ')})`;
   let buf = Buffer.from(await res.arrayBuffer());
   if (buf[0] === 0x1f && buf[1] === 0x8b) buf = gunzipSync(buf);
   const json = JSON.parse(buf.toString('utf8'));
