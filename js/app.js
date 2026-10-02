@@ -10,6 +10,7 @@ import { vetResults, pickLabelFields, displayTitle, describeCandidate, sourceLin
 import { RELAY_URL } from './config.js';
 import { DETAIL_LEVELS, simplifyCollection, countPoints, estimateBytes, prettyBytes, sizeWarnings } from './simplify.js';
 import { makeMatcher } from './listfilter.js';
+import { MODES, MAX_STOPS, buildRoute, parseMapsLink } from './routes.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -24,6 +25,7 @@ const KIND = {
   sldu: 'State senate district',
   cd: 'Congressional district',
   county: 'County',
+  route: 'Route',
   place: 'City or town',
   school: 'School district',
   tract: 'Census tract',
@@ -62,6 +64,14 @@ map.on('load', () => {
     paint: { 'line-color': '#0a4349', 'line-width': 2 } });
   map.addLayer({ id: 'data-point', type: 'circle', source: 'data', filter: ['==', '$type', 'Point'],
     paint: { 'circle-radius': 5, 'circle-color': '#ffc933', 'circle-stroke-color': '#0a4349', 'circle-stroke-width': 2 } });
+  map.addSource('route', { type: 'geojson', data: EMPTY });
+  map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#ffffff', 'line-width': 7 } });
+  // Road legs are solid; the flight leg is dashed. (Dash patterns cannot vary per feature, hence two layers.)
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route', filter: ['!=', ['get', 'mode'], 'Fly'], layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#0f5c63', 'line-width': 4 } });
+  map.addLayer({ id: 'route-fly', type: 'line', source: 'route', filter: ['==', ['get', 'mode'], 'Fly'],
+    paint: { 'line-color': '#0f5c63', 'line-width': 3, 'line-dasharray': [2, 2] } });
   map.addLayer({ id: 'preview-line', type: 'line', source: 'preview',
     paint: { 'line-color': '#10222b', 'line-width': 3, 'line-dasharray': [2, 1.5] } });
   mapReady = true;
@@ -261,18 +271,30 @@ function setMode(m) {
   mode = m;
   $('mode-spot').setAttribute('aria-pressed', String(m === 'spot'));
   $('mode-list').setAttribute('aria-pressed', String(m === 'list'));
+  $('mode-route').setAttribute('aria-pressed', String(m === 'route'));
   if (popup) { popup.remove(); popup = null; }
   setPreview(null);
-  if (m === 'list') {
+  map.getCanvas().style.cursor = m === 'route' ? 'crosshair' : '';
+  if (m !== 'route' && $('route').open) $('route').open = false;
+  if (m !== 'spot') {
     if (marker) { marker.remove(); marker = null; }
     $('here').hidden = true;
-    status('Click a shape on the map to inspect it, remove it, or keep only that one.');
-  } else {
-    status('Click anywhere on the map to see the boundaries at that spot.');
   }
+  if (m === 'list') status('Click a shape on the map to inspect it, remove it, or keep only that one.');
+  else if (m === 'route') {
+    if (!$('route').open) $('route').open = true;
+    $('panel').classList.remove('collapsed');
+    $('route').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    status('Click the map to add stops in the order you will travel.');
+  } else status('Click anywhere on the map to see the boundaries at that spot.');
 }
 $('mode-spot').addEventListener('click', () => setMode('spot'));
 $('mode-list').addEventListener('click', () => setMode('list'));
+$('mode-route').addEventListener('click', () => setMode('route'));
+$('route').addEventListener('toggle', () => {
+  if ($('route').open && mode !== 'route') setMode('route');
+  else if (!$('route').open && mode === 'route') setMode(selection.size ? 'list' : 'spot');
+});
 
 function hitCard(f, close) {
   const full = selection.get(f.properties._key) || f;
@@ -320,6 +342,7 @@ function inspectList(point, lngLat) {
 }
 
 map.on('click', (e) => {
+  if (mode === 'route') return addStop({ lng: e.lngLat.lng, lat: e.lngLat.lat, label: '' });
   if (mode === 'list') return inspectList(e.point, e.lngLat);
   identify(e.lngLat.lng, e.lngLat.lat).catch((err) => status(err.message, 'error'));
 });
@@ -693,6 +716,162 @@ $('detail').addEventListener('submit', (e) => {
   });
 });
 
+// ---------- Routes ----------
+let routeStops = []; // { lng, lat, label, marker }
+let routeResult = null;
+let routeToken = 0;
+let routeTimer = 0;
+let airportsCache = null;
+const routeMode = () => document.querySelector('input[name="rmode"]:checked').value;
+
+async function loadAirports() {
+  if (!airportsCache) airportsCache = (await getJson('data/airports.json')).airports;
+  return airportsCache;
+}
+
+function stopLabel(s, i) {
+  return s.label || `Stop ${i + 1} (${s.lat.toFixed(4)}, ${s.lng.toFixed(4)})`;
+}
+
+function addStop(stop, { recalc = true } = {}) {
+  if (routeStops.length >= MAX_STOPS) return status(`A route can have at most ${MAX_STOPS} stops.`, 'error');
+  const pin = el('div', { className: 'stop-pin' });
+  const s = { ...stop };
+  s.marker = new maplibregl.Marker({ element: pin, draggable: true }).setLngLat([s.lng, s.lat]).addTo(map);
+  s.marker.on('dragend', () => {
+    const p = s.marker.getLngLat();
+    s.lng = p.lng; s.lat = p.lat; s.label = '';
+    renderStops(); scheduleRoute();
+  });
+  // Clicking a pin should not also drop a new stop underneath it.
+  pin.addEventListener('click', (e) => e.stopPropagation());
+  routeStops.push(s);
+  renderStops();
+  if (recalc) scheduleRoute();
+}
+
+function renderStops() {
+  const ol = $('r-stops');
+  ol.replaceChildren();
+  ol.hidden = routeStops.length === 0;
+  routeStops.forEach((s, i) => {
+    s.marker.getElement().textContent = String(i + 1);
+    const up = el('button', { type: 'button', textContent: 'Up', disabled: i === 0 });
+    up.setAttribute('aria-label', `Move stop ${i + 1} earlier`);
+    up.addEventListener('click', () => { [routeStops[i - 1], routeStops[i]] = [routeStops[i], routeStops[i - 1]]; renderStops(); scheduleRoute(); });
+    const rm = el('button', { type: 'button', textContent: 'Remove' });
+    rm.setAttribute('aria-label', `Remove stop ${i + 1}`);
+    rm.addEventListener('click', () => { s.marker.remove(); routeStops.splice(i, 1); renderStops(); scheduleRoute(); });
+    ol.append(el('li', {}, el('span', { className: 'num', textContent: String(i + 1) }), el('span', { className: 'lbl', textContent: stopLabel(s, i), title: stopLabel(s, i) }), up, rm));
+  });
+}
+
+function scheduleRoute() {
+  clearTimeout(routeTimer);
+  routeTimer = setTimeout(drawRoute, 350);
+}
+
+async function drawRoute() {
+  const token = ++routeToken;
+  routeResult = null;
+  $('r-save').disabled = true;
+  if (routeStops.length < 2) {
+    whenReady(() => map.getSource('route').setData(EMPTY));
+    $('r-summary').textContent = routeStops.length ? 'Add one more stop to see the route.' : '';
+    return;
+  }
+  $('r-summary').textContent = 'Finding the route…';
+  try {
+    const m = routeMode();
+    const r = await buildRoute(routeStops, m, { relay: RELAY_URL, airports: m === 'plane' ? await loadAirports() : [] });
+    if (token !== routeToken) return;
+    routeResult = r;
+    whenReady(() => map.getSource('route').setData({ type: 'FeatureCollection', features: r.features }));
+    const extra = r.ignoredStops ? ' Fly + drive uses only your first and last stops.' : '';
+    $('r-summary').textContent = `${r.summary}${extra}`;
+    $('r-save').disabled = false;
+    $('source-note').textContent = `Directions: ${r.provider}, © OpenStreetMap contributors`;
+  } catch (e) {
+    if (token !== routeToken) return;
+    whenReady(() => map.getSource('route').setData(EMPTY));
+    $('r-summary').textContent = e.message;
+  }
+}
+document.querySelectorAll('input[name="rmode"]').forEach((r) => r.addEventListener('change', scheduleRoute));
+
+function clearRoute() {
+  routeStops.forEach((s) => s.marker.remove());
+  routeStops = [];
+  routeResult = null;
+  routeToken++;
+  renderStops();
+  whenReady(() => map.getSource('route').setData(EMPTY));
+  $('r-summary').textContent = '';
+  $('r-save').disabled = true;
+}
+$('r-clear').addEventListener('click', clearRoute);
+
+$('r-add').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = $('r-text').value.trim();
+  if (!text) return;
+  run(e.submitter, 'Finding that place…', async () => {
+    let res = await searchPlaces(text);
+    if (!res.length && cleanAddress(text) !== text) res = await searchPlaces(cleanAddress(text));
+    if (!res.length) return status('No place found. Try the street and city only.', 'error');
+    addStop({ lng: res[0].lng, lat: res[0].lat, label: res[0].name.split(',').slice(0, 2).join(',') });
+    $('r-text').value = '';
+    if (routeStops.length === 1) map.flyTo({ center: [res[0].lng, res[0].lat], zoom: 11, duration: 600 });
+    else fit(bboxOf({ features: routeStops.map((s) => ({ geometry: { type: 'Point', coordinates: [s.lng, s.lat] } })) }), 13);
+    status(`Added stop ${routeStops.length}.`);
+  });
+});
+
+$('r-save').addEventListener('click', () => {
+  if (!routeResult) return;
+  const stamp = Date.now();
+  const tagged = routeResult.features.map((f, i) => ({ ...f, properties: { ...f.properties, _type: 'route', _layer: 'Route', _key: `route:${stamp}:${i}` } }));
+  const n = tagged.length;
+  clearRoute();
+  addFeatures(tagged);
+  // GPS apps want GPX, so pick it when the list is nothing but routes.
+  if (!fmtTouched && [...selection.values()].every((f) => f.properties._type === 'route')) {
+    document.querySelector('input[name="fmt"][value="gpx"]').checked = true;
+    updateDownload();
+  }
+  status(`Added the route to your list${n > 1 ? ` as ${n} parts` : ''}. Download it below.`);
+});
+
+$('r-link').addEventListener('submit', (e) => {
+  e.preventDefault();
+  run(e.submitter, 'Reading the link…', async () => {
+    let parsed = parseMapsLink($('r-url').value);
+    if (parsed.short) {
+      if (!RELAY_URL) throw new Error('Short links (maps.app.goo.gl) cannot be read yet. Open the link in your browser, then copy the long address from the address bar and paste that.');
+      const j = await getJson(`${RELAY_URL.replace(/\/+$/, '')}/resolve?url=${encodeURIComponent(parsed.url)}`);
+      parsed = parseMapsLink(j.url);
+      if (parsed.short) throw new Error('That short link could not be opened. Paste the long address from Google Maps instead.');
+    }
+    clearRoute();
+    const missed = [];
+    for (const s of parsed.stops) {
+      if (s.lng == null) {
+        status(`Finding "${s.label}"…`, 'busy');
+        let res = await searchPlaces(s.text);
+        if (!res.length && cleanAddress(s.text) !== s.text) res = await searchPlaces(cleanAddress(s.text));
+        if (!res.length) { missed.push(s.label); continue; }
+        s.lng = res[0].lng; s.lat = res[0].lat;
+      }
+      addStop({ lng: s.lng, lat: s.lat, label: s.label }, { recalc: false });
+    }
+    if (routeStops.length < 2) throw new Error(`Could not find ${missed.length ? `"${missed.join('", "')}"` : 'the stops in that link'}. Add them by address instead.`);
+    document.querySelector(`input[name="rmode"][value="${parsed.mode}"]`).checked = true;
+    fit(bboxOf({ features: routeStops.map((s) => ({ geometry: { type: 'Point', coordinates: [s.lng, s.lat] } })) }), 13);
+    scheduleRoute();
+    status(missed.length ? `Read the link, but could not find "${missed.join('", "')}". Add it by address.` : `Read ${routeStops.length} stops from the link. Check the route, then add it to your list.`, missed.length ? 'error' : '');
+  });
+});
+
 // ---------- Paste a link (advanced) ----------
 async function openUrl(url) {
   const r = await inspectUrl(url);
@@ -770,7 +949,8 @@ function updateDownload() {
     if (warns.length) $('look').open = true;
   }, 250);
 }
-document.querySelectorAll('input[name="fmt"]').forEach((r) => r.addEventListener('change', updateDownload));
+let fmtTouched = false;
+document.querySelectorAll('input[name="fmt"]').forEach((r) => r.addEventListener('change', () => { fmtTouched = true; updateDownload(); }));
 ['x-detail', 'k-attrs'].forEach((id) => $(id).addEventListener('change', updateDownload));
 $('x-name').addEventListener('input', () => { nameTouched = true; });
 

@@ -225,3 +225,17 @@ label.fmt small { display: block; }
 input[type='range'] { width: 100%; }
 #size-note { margin: 0; }
 #detail-report { font-size: 13px; }
+
+/* ---- Routes ---- */
+.modes { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.modes label { cursor: pointer; }
+.modes input { position: absolute; opacity: 0; pointer-events: none; }
+.modes span { display: inline-block; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--fog); font-weight: 700; }
+.modes input:checked + span { background: var(--tape); border-color: var(--ink-soft); }
+.modes input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
+#r-stops { list-style: none; max-height: 220px; }
+#r-stops li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
+#r-stops .num, .stop-pin { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #0a4349; color: #fff; font-weight: 700; font-size: 13px; flex: none; }
+.stop-pin { border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); cursor: grab; }
+#r-stops .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#r-stops button { font-size: 12px; padding: 3px 8px; cursor: pointer; }

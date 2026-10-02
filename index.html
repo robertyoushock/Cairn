@@ -102,6 +102,36 @@
           </div>
         </form>
 
+        <details class="more" id="route">
+          <summary>Make a route</summary>
+          <p class="lead"><strong>Click the map</strong> to drop stops in order, or add them by address. Drag a pin to adjust it.</p>
+          <fieldset class="modes" id="r-modes">
+            <legend class="sr">How are you traveling?</legend>
+            <label><input type="radio" name="rmode" value="car" checked><span>Drive</span></label>
+            <label><input type="radio" name="rmode" value="bike"><span>Bike</span></label>
+            <label><input type="radio" name="rmode" value="walk"><span>Walk</span></label>
+            <label><input type="radio" name="rmode" value="plane"><span>Fly + drive</span></label>
+          </fieldset>
+          <form id="r-add" class="find">
+            <label class="sr" for="r-text">Add a stop by address or place</label>
+            <input id="r-text" type="search" placeholder="Add a stop by address or place" autocomplete="off">
+            <button type="submit" class="quiet">Add stop</button>
+          </form>
+          <ol id="r-stops" class="rows" hidden></ol>
+          <p id="r-summary" class="lead" role="status"></p>
+          <div class="row">
+            <button type="button" id="r-save" class="primary" disabled>Add route to my list</button>
+            <button type="button" id="r-clear" class="quiet">Start over</button>
+          </div>
+          <form id="r-link" class="stack">
+            <label>Or paste a Google Maps directions link
+              <input id="r-url" type="url" placeholder="https://www.google.com/maps/dir/…" spellcheck="false">
+            </label>
+            <button type="submit">Read this link</button>
+            <small>Cairn redraws the route with open map data, so it can differ a little from Google&rsquo;s.</small>
+          </form>
+        </details>
+
         <details class="more" id="other">
           <summary>Have a link to a map service?</summary>
           <form id="url-form" class="stack">
@@ -187,6 +217,7 @@
       <div class="modebar" role="group" aria-label="What a map click does">
         <button type="button" id="mode-spot" aria-pressed="true" title="Click the map to see every boundary at that spot">What&rsquo;s here?</button>
         <button type="button" id="mode-list" aria-pressed="false" title="Click shapes you added to inspect, remove or keep them">My list <span id="mode-count"></span></button>
+        <button type="button" id="mode-route" aria-pressed="false" title="Click the map to drop route stops">Route</button>
       </div>
       <button id="panel-toggle" class="sheet-toggle" aria-controls="panel" aria-expanded="true">Hide panel</button>
     </main>
