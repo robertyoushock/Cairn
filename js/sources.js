@@ -482,10 +482,13 @@ export async function gunzipToText(res) {
   return new Response(stream).text();
 }
 
+// Works for full addresses and for files that ship with Cairn ("data/courses/…").
+const hostOf = (u) => { try { return new URL(u, typeof location !== 'undefined' ? location.href : 'http://localhost/').host; } catch { return 'That source'; } };
+
 export async function loadGeoJsonUrl({ url, gz = false, labelField = null, fixedLabel = null, bbox = null, limit = 50000, relay = '', relayFirst = false }) {
   const attempt = async (u) => {
     const res = await fetch(u);
-    if (!res.ok) throw new Error(`${new URL(u).host} answered ${res.status}.`);
+    if (!res.ok) throw new Error(`${hostOf(u)} answered ${res.status}.`);
     const text = gz ? await gunzipToText(res) : await res.text();
     return JSON.parse(text);
   };
@@ -498,7 +501,7 @@ export async function loadGeoJsonUrl({ url, gz = false, labelField = null, fixed
   } catch (e) {
     if (!relay) {
       throw new Error(
-        `${new URL(url).host} does not allow direct browser access, and the Cairn relay is not set up yet. ` +
+        `${hostOf(url)} does not allow direct browser access, and the Cairn relay is not set up yet. ` +
         'Anything that needs it is marked in the results.'
       );
     }

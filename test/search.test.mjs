@@ -56,10 +56,26 @@ assert.deepEqual(ids('school districts colorado'), [], 'no false positives');
 assert.deepEqual(ids('xyzzy'), []);
 assert.ok(ids('wildfire perimeters')[0].includes('perimeters'));
 assert.ok(tokenize('The Fires of Colorado').includes('fires'));
+// ---- marathons ----
+assert.equal(ids('denver marathon')[0], 'marathon-denver-course', 'the course comes before its stations');
+assert.ok(ids('denver marathon').includes('marathon-denver-water'));
+assert.equal(ids('colfax marathon water stations')[0], 'marathon-denver-water');
+assert.equal(ids('la marathon')[0], 'marathon-la-course');
+assert.equal(ids('chicago marathon route')[0], 'marathon-chicago-course');
+assert.equal(ids('marine corps marathon')[0], 'marathon-dc-course');
+const allM = searchCatalog(cat.entries, 'marathon', 40).map((e) => e.kind);
+assert.ok(allM.lastIndexOf('course') < allM.findIndex((k) => k !== 'course'), '"marathon" alone lists every course before any station layer');
+assert.deepEqual(ids('marathon county wisconsin'), [], 'Marathon County is a county, not a race');
+assert.equal(boundaryResult('marathon county wisconsin').type, 'county');
+const course = JSON.parse(fs.readFileSync(new URL('../data/courses/denver-colfax-2026.geojson', import.meta.url)));
+assert.equal(course.features[0].geometry.type, 'LineString');
+assert.ok(Math.abs(course.features[0].properties.miles - 26.2) < 0.7, 'a marathon course is about 26.2 miles');
+
 // every catalog entry has what the UI needs
 for (const e of cat.entries) {
   assert.ok(e.id && e.title && e.agency && e.description && e.url && ['arcgis', 'geojson'].includes(e.type), e.id);
-  assert.ok(e.type === 'geojson' ? e.labelField || e.fixedLabel : e.labelField, `${e.id} has an explicit label`);
+  assert.ok(e.labelField || e.fixedLabel, `${e.id} has an explicit label`);
+  if (!/^https:/.test(e.url)) assert.ok(fs.existsSync(new URL(`../${e.url}`, import.meta.url)), `${e.id} points at a file that ships with Cairn`);
 }
 
 // ---- label field choice: the real NIFC trap ----

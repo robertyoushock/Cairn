@@ -22,7 +22,8 @@ export function scoreEntry(entry, query) {
   }
   // Every word should land somewhere. A single stray word is not a match.
   if (matched < q.length) return matched / q.length >= 0.75 ? score * 0.5 : 0;
-  return score;
+  // Within a group such as marathons, the course itself comes before its water stations and mile markers.
+  return score + (entry.kind === 'course' ? 0.5 : 0);
 }
 
 export function searchCatalog(entries, query, limit = 6) {

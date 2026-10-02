@@ -166,6 +166,30 @@ then placed in a browser frame with callouts using a throwaway HTML page rendere
 font (Schibsted Grotesk) and colors. `img/social.png` (the link preview) was made the same way. If the UI changes
 a lot, retake them; the README says what each one shows.
 
+### Marathon courses
+
+Robert asked for major city marathons to come up in search, with water stations where the data exists. There is
+no single open dataset of race courses (OpenStreetMap has only Boston, and its relation holds both sides of
+divided roads, so it does not stitch into one line). Each course is its own small research job. Three kinds:
+
+1. **Live ArcGIS layers** where a city, county or the race publishes one (Los Angeles, Marine Corps, Oklahoma City,
+   Chicago, Twin Cities, St. George, Anchorage). Catalog entries with `"group": "marathon"`. Many services hold
+   several things in one layer, so entries carry a `where` filter and sometimes a `fixedLabel`.
+2. **Static files in `data/courses/`** copied from the organizer's own public course map (Denver Colfax: the
+   official page embeds a RaceJoy map whose course, mile marker, water stop and medical KML files are public).
+   Look for this first on any race site: open the course page, list its iframes and network requests.
+3. **Traced by Cairn**: when an organizer publishes only a picture and turn-by-turn directions, the course is
+   drawn by routing along OpenStreetMap roads through each turn, then checked against 26.2 miles. These say
+   "approximate" in their description.
+
+How to add one: get the line as GeoJSON, check its length is 26.2 to 26.8 miles (hand-drawn lines run long), save
+it in `data/courses/`, add catalog entries for the course and any station layers, say the year in `freshness`,
+and credit the source. `scripts/course_tools.py` has the helpers that wrote the existing files. Courses change
+most years; the catalog check cannot tell a stale course from a current one, so review them each season.
+
+Sources that did not work: Garmin Connect courses (need a login), NYRR's course page (no data behind it),
+Overpass (timed out every time).
+
 ### Automated checks
 
 - `.github/workflows/test.yml` runs `npm test` on every push.

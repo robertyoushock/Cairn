@@ -28,14 +28,15 @@ async function getJson(url, tries = 3) {
 
 export async function checkArcgis(entry, get = getJson) {
   const info = await get(`${entry.url}?f=json`);
+  const where = encodeURIComponent(entry.where || '1=1');
   if (!info.geometryType) return 'is no longer a map layer (no shapes)';
   const fields = (info.fields || []).map((f) => f.name);
   if (entry.labelField && !fields.includes(entry.labelField)) return `no longer has the name field "${entry.labelField}" (fields now: ${fields.slice(0, 12).join(', ')})`;
-  const count = (await get(`${entry.url}/query?where=1%3D1&returnCountOnly=true&f=json`)).count;
+  const count = (await get(`${entry.url}/query?where=${where}&returnCountOnly=true&f=json`)).count;
   // Live feeds such as current fires can honestly be empty; anything else at zero is broken.
   if (!count && !/current|24|live|alerts/i.test(`${entry.id} ${entry.freshness}`)) return 'has no features';
   if (count && entry.labelField) {
-    const q = await get(`${entry.url}/query?where=1%3D1&outFields=${encodeURIComponent(entry.labelField)}&returnGeometry=false&resultRecordCount=25&f=json`);
+    const q = await get(`${entry.url}/query?where=${where}&outFields=${encodeURIComponent(entry.labelField)}&returnGeometry=false&resultRecordCount=25&f=json`);
     const vals = (q.features || []).map((f) => f.attributes?.[entry.labelField]);
     const named = vals.filter((v) => v != null && String(v).trim() !== '').length;
     if (vals.length && named / vals.length < 0.5) return `name field "${entry.labelField}" is mostly blank (${named} of ${vals.length} sampled)`;
@@ -44,6 +45,13 @@ export async function checkArcgis(entry, get = getJson) {
 }
 
 export async function checkGeojson(entry) {
+  // Files that ship with Cairn are read from the repo itself.
+  if (!/^https?:/.test(entry.url)) {
+    try {
+      const local = JSON.parse(fs.readFileSync(new URL(`../${entry.url}`, import.meta.url)));
+      return (local.features || []).some((f) => f.geometry) ? null : 'has no features';
+    } catch (e) { return `file is missing or unreadable (${e.message})`; }
+  }
   // Sources that block browsers are checked the way visitors reach them: through Cairn's helper.
   const url = entry.needsRelay && RELAY_URL ? `${RELAY_URL.replace(/\/+$/, '')}/?url=${encodeURIComponent(entry.url)}` : entry.url;
   const res = await fetch(url, { signal: AbortSignal.timeout(120000), headers: { 'User-Agent': 'cairn-catalog-check (github.com/robertyoushock/cairn)' } });

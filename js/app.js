@@ -597,7 +597,7 @@ $('find-form').addEventListener('submit', (e) => {
     const entries = await loadCatalog();
     if (token !== findToken) return;
     const b = boundaryResult(text);
-    const cat = searchCatalog(entries, text);
+    const cat = searchCatalog(entries, text, 12);
     if (b) {
       verified.append(resultRow(b.title, b.sub, { text: 'Verified' }, () => pickBoundary(b), 'https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_main.html'));
     }
@@ -710,6 +710,8 @@ async function openDetail(d) {
   $('detail').hidden = false;
   $('detail-title').textContent = title;
   $('detail-source').replaceChildren(sourceAnchor(entry ? entry.page || entry.url : sourceLink(cand), title, 'src inline') || '');
+  // Some verified layers hold several things (every race distance, every kind of station); the entry says which rows it means.
+  $('l-where').value = entry?.where || '1=1';
   $('detail-meta').textContent = entry ? `${entry.description} Source: ${entry.attribution}.` : `${describeCandidate(cand)}${cand.copyright ? `. ${cand.copyright.slice(0, 120)}` : ''}`;
   const warn = $('detail-warn');
   const add = $('detail-add');
@@ -762,7 +764,7 @@ async function openDetail(d) {
         setLabelOptions(pickLabelFields(info.fields, info.displayField), entry.labelField);
         sel.value = entry.labelField || sel.value;
       }
-      const r = await loadLayer({ url, limit: 300, bbox: big ? mapBbox() : null, generalize: big ? 0 : 0.003 });
+      const r = await loadLayer({ url, where: entry?.where || '1=1', limit: 300, bbox: big ? mapBbox() : null, generalize: big ? 0 : 0.003 });
       sample = r.fc.features;
     } else {
       const r = await loadGeoJsonUrl({ url: entry.url, gz: !!entry.gz, labelField: entry.labelField, fixedLabel: entry.fixedLabel, limit: 300, bbox: big ? mapBbox() : null, relay: RELAY_URL, relayFirst: !!entry.needsRelay });
@@ -810,6 +812,7 @@ $('detail').addEventListener('submit', (e) => {
     let r;
     if (d.cand || d.entry.type === 'arcgis') {
       r = await loadLayer({ url: d.cand ? d.cand.url : d.entry.url, where: $('l-where').value, bbox, limit, labelField, labelPrefix: prefixFor(d, labelField), onProgress });
+      if (d.entry?.fixedLabel) applyLabels(r.fc.features, null, d.entry.fixedLabel);
     } else {
       r = await loadGeoJsonUrl({ url: d.entry.url, gz: !!d.entry.gz, labelField, fixedLabel: d.entry.fixedLabel, bbox, limit, relay: RELAY_URL, relayFirst: !!d.entry.needsRelay });
     }
