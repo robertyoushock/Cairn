@@ -1,3 +1,4 @@
-// Optional: URL of a deployed Cairn relay (see worker/README.md). Needed only for sources whose servers
-// block browser requests, such as the DeFlock camera export. Leave empty to run without it.
-export const RELAY_URL = '';
+// Address of Cairn's helper on Cloudflare Workers (worker/relay.js). An empty string turns the helper off;
+// everything still works except DeFlock cameras and short Google Maps links.
+// This is an address, not a secret. Secrets (the routing key) live only inside Cloudflare.
+export const RELAY_URL = 'https://cairn-relay.robertyoushock.workers.dev';

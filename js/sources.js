@@ -430,13 +430,16 @@ export function applyLabels(features, labelField, fixedLabel = null, prefix = ''
   return features;
 }
 
-async function gunzipToText(res) {
+// Some servers and relays unpack gzip on the way through and some do not, so look at the first two bytes
+// (gzip always starts 1f 8b) instead of trusting the file name.
+export async function gunzipToText(res) {
+  const buf = new Uint8Array(await res.arrayBuffer());
+  if (buf[0] !== 0x1f || buf[1] !== 0x8b) return new TextDecoder().decode(buf);
   if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack compressed data. Try a current Chrome, Safari or Firefox.');
-  const stream = res.body.pipeThrough(new DecompressionStream('gzip'));
+  const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
   return new Response(stream).text();
 }
 
-// Load a GeoJSON file from a URL. Falls back to the Cairn relay when the host blocks browser requests.
 export async function loadGeoJsonUrl({ url, gz = false, labelField = null, fixedLabel = null, bbox = null, limit = 50000, relay = '' }) {
   const attempt = async (u) => {
     const res = await fetch(u);

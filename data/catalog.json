@@ -213,7 +213,7 @@
       "id": "deflock-alpr-cameras",
       "title": "License plate reader cameras (Flock and others)",
       "agency": "DeFlock, from OpenStreetMap contributors",
-      "description": "Crowdsourced locations of automated license plate readers across the US.",
+      "description": "Crowdsourced locations of automated license plate readers across the US. Large, so zoom to your city first.",
       "keywords": [
         "flock",
         "flock safety",

@@ -724,6 +724,16 @@ let routeTimer = 0;
 let airportsCache = null;
 const routeMode = () => document.querySelector('input[name="rmode"]:checked').value;
 
+// Ask the helper once whether it has a routing key. Without one, skip it and go straight to the keyless server.
+let relayRouting = null;
+async function routingRelay() {
+  if (!RELAY_URL) return '';
+  if (relayRouting === null) {
+    relayRouting = await fetch(`${RELAY_URL.replace(/\/+$/, '')}/health`).then((r) => r.json()).then((j) => Boolean(j.routing)).catch(() => false);
+  }
+  return relayRouting ? RELAY_URL : '';
+}
+
 async function loadAirports() {
   if (!airportsCache) airportsCache = (await getJson('data/airports.json')).airports;
   return airportsCache;
@@ -783,7 +793,7 @@ async function drawRoute() {
   $('r-summary').textContent = 'Finding the route…';
   try {
     const m = routeMode();
-    const r = await buildRoute(routeStops, m, { relay: RELAY_URL, airports: m === 'plane' ? await loadAirports() : [] });
+    const r = await buildRoute(routeStops, m, { relay: await routingRelay(), airports: m === 'plane' ? await loadAirports() : [] });
     if (token !== routeToken) return;
     routeResult = r;
     whenReady(() => map.getSource('route').setData({ type: 'FeatureCollection', features: r.features }));

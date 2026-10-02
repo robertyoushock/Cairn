@@ -19,6 +19,7 @@ export const ALLOWED_ORIGINS = [
 ];
 export const PROFILES = { car: 'driving-car', bike: 'cycling-regular', walk: 'foot-walking' };
 export const MAX_ROUTE_POINTS = 25;
+const SHORT_HOSTS = /^(maps\.app\.goo\.gl|goo\.gl)$/;
 const MAPS_HOSTS = /^(maps\.app\.goo\.gl|goo\.gl|maps\.google\.com|www\.google\.com|google\.com)$/;
 
 export function checkRequest(requestUrl, origin) {
@@ -102,13 +103,15 @@ export default {
       if (url.pathname === '/resolve') {
         const check = checkMapsLink(url.searchParams.get('url') || '');
         if (!check.ok) return json({ error: check.message }, 400, cors);
+        // Only short links are followed. A full google.com address is returned as it is, because Google
+        // answers automated requests for those with a robot check page.
         let target = check.target;
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 3 && SHORT_HOSTS.test(new URL(target).hostname); i++) {
           const r = await fetch(target, { redirect: 'manual', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Cairn)' } });
           const next = r.headers.get('Location');
-          if (r.status < 300 || r.status >= 400 || !next) break;
+          if (r.status < 300 || r.status >= 400 || !next) return json({ error: 'That short link could not be opened.' }, 502, cors);
           const step = checkMapsLink(new URL(next, target).toString());
-          if (!step.ok) break;
+          if (!step.ok || step.target.includes('/sorry/')) return json({ error: 'That short link could not be opened.' }, 502, cors);
           target = step.target;
         }
         return json({ url: target }, 200, cors);

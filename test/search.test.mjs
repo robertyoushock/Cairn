@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { parseIntent, boundaryResult, findState } from '../js/intent.js';
 import { scoreEntry, searchCatalog, tokenize } from '../js/catalog.js';
 import { pickLabelFields, scoreCandidate, dedupe, displayTitle, describeCandidate, distanceToBox, sortCandidates, sourceLink } from '../js/vet.js';
-import { applyLabels } from '../js/sources.js';
+import { applyLabels, gunzipToText } from '../js/sources.js';
 
 // ---- plain-language intent ----
 assert.deepEqual({ ...parseIntent('texas state house'), zips: undefined }, { type: 'sldl', state: '48', zips: undefined, numbers: [] });
@@ -119,5 +119,10 @@ assert.match(describeCandidate({ ...base, distKm: 100 }), /62 mi away/);
 assert.equal(sourceLink({ itemId: 'abc123', url: 'https://x/FeatureServer/0' }), 'https://www.arcgis.com/home/item.html?id=abc123');
 assert.equal(sourceLink({ url: 'https://x/FeatureServer/0' }), 'https://x/FeatureServer/0');
 for (const e of cat.entries) assert.ok(e.page || e.url, `${e.id} has a source page`);
+
+// gzip is detected by content, since relays sometimes unpack it on the way through
+const gz = new Response(new Blob(['{"a":1}']).stream().pipeThrough(new CompressionStream('gzip')));
+assert.equal(await gunzipToText(new Response(await gz.arrayBuffer())), '{"a":1}');
+assert.equal(await gunzipToText(new Response('{"a":2}')), '{"a":2}');
 
 console.log('search checks passed');

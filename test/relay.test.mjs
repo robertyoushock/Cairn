@@ -48,5 +48,17 @@ r = await worker.fetch(req('/route', { method: 'POST', body, headers: { Origin: 
 assert.equal(r.status, 403);
 r = await worker.fetch(req('/health'), { ORS_KEY: 'secret' });
 assert.deepEqual(await r.json(), { ok: true, routing: true });
+// short links are followed one hop; full links are returned untouched
+let hops = 0;
+globalThis.fetch = async (u) => { hops++; return new Response(null, { status: 302, headers: { Location: 'https://www.google.com/maps/dir/Denver/Boulder' } }); };
+r = await worker.fetch(req('/resolve?url=' + encodeURIComponent('https://maps.app.goo.gl/abc')), {});
+assert.deepEqual(await r.json(), { url: 'https://www.google.com/maps/dir/Denver/Boulder' });
+assert.equal(hops, 1);
+r = await worker.fetch(req('/resolve?url=' + encodeURIComponent('https://www.google.com/maps/dir/A/B')), {});
+assert.deepEqual(await r.json(), { url: 'https://www.google.com/maps/dir/A/B' });
+assert.equal(hops, 1, 'google.com itself is never fetched');
+globalThis.fetch = async () => new Response(null, { status: 302, headers: { Location: 'https://www.google.com/sorry/index?continue=x' } });
+r = await worker.fetch(req('/resolve?url=' + encodeURIComponent('https://maps.app.goo.gl/abc')), {});
+assert.equal(r.status, 502, 'a robot-check page is reported, not returned');
 globalThis.fetch = realFetch;
 console.log('relay checks passed');
