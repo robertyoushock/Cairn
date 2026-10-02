@@ -622,7 +622,12 @@ async function openDetail(d) {
   // Huge datasets default to the current map view, so "Add" never tries to pull the whole country.
   $('l-view').checked = big;
   $('detail-limit').open = big;
-  if (big) notes.push(`This dataset is very large, so only what is on the screen right now will be added.${map.getZoom() < 8 ? ' Zoom in to your town or county first for a useful result.' : ''}`);
+  const tooWide = big && map.getZoom() < 8;
+  if (big) notes.push(tooWide
+    ? 'This dataset is very large. Zoom the map in to your town or county, then press "Preview this area".'
+    : 'This dataset is very large, so only what is on the screen right now will be added.');
+  $('detail-reload').hidden = !big;
+  add.disabled = add.disabled || tooWide;
   $('detail-report').href = reportLink(title, entry ? entry.url : cand.url, $('find-text').value.trim());
   if (notes.length) { warn.textContent = notes.join(' '); warn.hidden = false; }
   $('detail-sample').textContent = '';
@@ -639,6 +644,7 @@ async function openDetail(d) {
 
   if (cand) setLabelOptions(cand.labelOptions, cand.labelField);
   if (blocked) return status('Preview unavailable until the relay is set up.', 'error');
+  if (tooWide) return status('Zoom in first, then press "Preview this area".');
 
   status('Loading a preview…', 'busy');
   try {
@@ -666,7 +672,7 @@ async function openDetail(d) {
     }
     refreshSample();
     whenReady(() => map.getSource('preview').setData({ type: 'FeatureCollection', features: sample }));
-    fit(bboxOf({ features: sample }), 9);
+    if (!big) fit(bboxOf({ features: sample }), 9); // big datasets stay on the area the person chose
     status('Check the names below. Change "Name each shape by" if they look wrong.');
   } catch (e) {
     if (token === findToken) status(`Could not preview this: ${e.message}`, 'error');
@@ -684,6 +690,7 @@ function refreshSample() {
 }
 $('detail-label').addEventListener('change', refreshSample);
 $('detail-back').addEventListener('click', () => { showResults(); status(''); });
+$('detail-reload').addEventListener('click', () => { if (detail) openDetail({ source: detail.source, entry: detail.entry, cand: detail.cand }); });
 
 $('detail').addEventListener('submit', (e) => {
   e.preventDefault();
